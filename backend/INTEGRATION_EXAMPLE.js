@@ -8,7 +8,9 @@
 // Configuration
 const API_BASE_URL = 'http://localhost:5000/api';
 
-
+// ========================================
+// PLOT API FUNCTIONS
+// ========================================
 
 /**
  * Fetch all plots

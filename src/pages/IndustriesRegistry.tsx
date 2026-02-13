@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { Search, Filter, Download, Building2, MapPin, Phone, Mail, TrendingUp, Users, Calendar, FileCheck } from 'lucide-react';
+import { Search, Filter, Download, Building2, MapPin, Phone, Mail, TrendingUp, Users, Calendar, FileCheck, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { StatusBadge } from '../components/dashboard/StatusBadge';
+import { Button } from '../components/ui/button';
 import { industriesData, Industry } from '../lib/industries-data';
+import { getPlotByIndustryId } from '../lib/plots-data';
 
-export function IndustriesRegistry() {
+export function IndustriesRegistry({ onIndustrySelect }: { onIndustrySelect?: (industryId: string) => void }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDistrict, setFilterDistrict] = useState('All');
   const [filterIndustry, setFilterIndustry] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [selectedIndustryId, setSelectedIndustryId] = useState<string | null>(null);
 
   // Get unique districts and industry types
   const districts = ['All', ...Array.from(new Set(industriesData.map(ind => ind.district)))];
@@ -177,108 +180,144 @@ export function IndustriesRegistry() {
 
       {/* Industries List */}
       <div className="space-y-4">
-        {filteredIndustries.map((industry) => (
-          <Card key={industry.id} className="border-slate-200 hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="grid lg:grid-cols-12 gap-6">
-                {/* Main Information */}
-                <div className="lg:col-span-4">
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="h-12 w-12 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Building2 className="h-6 w-6 text-emerald-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-slate-900 mb-1 truncate">
-                        {industry.companyName}
-                      </h3>
-                      <p className="text-sm text-slate-600 mb-1">{industry.registrationNumber}</p>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge status={industry.complianceStatus} size="sm" />
-                        <span className="text-xs text-slate-500">{industry.industryType}</span>
+        {filteredIndustries.map((industry) => {
+          const assignedPlot = getPlotByIndustryId(industry.id);
+          const isSelected = selectedIndustryId === industry.id;
+          
+          return (
+            <Card
+              key={industry.id}
+              className={`border-slate-200 hover:shadow-md transition-all cursor-pointer ${
+                isSelected ? 'border-emerald-500 border-2 shadow-lg' : ''
+              }`}
+              onClick={() => {
+                setSelectedIndustryId(industry.id);
+                onIndustrySelect?.(industry.id);
+              }}
+            >
+              <CardContent className="p-6">
+                <div className="grid lg:grid-cols-12 gap-6">
+                  {/* Main Information */}
+                  <div className="lg:col-span-4">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className={`h-12 w-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        isSelected ? 'bg-emerald-500' : 'bg-emerald-100'
+                      }`}>
+                        <Building2 className={`h-6 w-6 ${
+                          isSelected ? 'text-white' : 'text-emerald-600'
+                        }`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-slate-900 mb-1 truncate">
+                          {industry.companyName}
+                        </h3>
+                        <p className="text-sm text-slate-600 mb-1">{industry.registrationNumber}</p>
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={industry.complianceStatus} size="sm" />
+                          <span className="text-xs text-slate-500">{industry.industryType}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Location & Plot Details */}
-                <div className="lg:col-span-4 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-600 truncate">{industry.location}</p>
-                      <p className="text-xs text-slate-500">{industry.district}</p>
+                  {/* Location & Plot Details */}
+                  <div className="lg:col-span-4 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-600 truncate">{industry.location}</p>
+                        <p className="text-xs text-slate-500">{industry.district}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-slate-600">
+                        <strong className="text-slate-900">Plot:</strong> {industry.plotNumber}
+                      </span>
+                      <span className="text-slate-600">
+                        <strong className="text-slate-900">Area:</strong> {industry.area.toLocaleString()} m²
+                      </span>
+                    </div>
+                    {assignedPlot && (
+                      <div className="pt-2 border-t border-slate-200">
+                        <span className="text-xs text-emerald-700 font-semibold">
+                          📍 Land Parcel: {assignedPlot.plotNumber} ({assignedPlot.status})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contact & Additional Info */}
+                  <div className="lg:col-span-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-slate-400" />
+                      <span className="text-sm text-slate-600">{industry.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-slate-400" />
+                      <span className="text-sm text-slate-600 truncate">{industry.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-slate-400" />
+                      <span className="text-sm text-slate-600">
+                        {industry.employeeCount} employees
+                      </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-slate-600">
-                      <strong className="text-slate-900">Plot:</strong> {industry.plotNumber}
-                    </span>
-                    <span className="text-slate-600">
-                      <strong className="text-slate-900">Area:</strong> {industry.area.toLocaleString()} m²
-                    </span>
+
+                  {/* Action Button */}
+                  <div className="lg:col-span-1 flex items-center justify-end">
+                    <Button
+                      size="sm"
+                      variant={isSelected ? 'default' : 'outline'}
+                      className="whitespace-nowrap"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedIndustryId(industry.id);
+                        onIndustrySelect?.(industry.id);
+                      }}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View on Map
+                    </Button>
                   </div>
                 </div>
 
-                {/* Contact & Additional Info */}
-                <div className="lg:col-span-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-slate-400" />
-                    <span className="text-sm text-slate-600">{industry.phone}</span>
+                {/* Expandable Details */}
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <div className="grid md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <p className="text-slate-500 mb-1">Production Capacity</p>
+                      <p className="text-slate-700 font-medium">{industry.productionCapacity}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 mb-1">Environmental Clearance</p>
+                      <p className="text-slate-700 font-medium">{industry.environmentalClearance}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 mb-1">Last Inspection</p>
+                      <p className="text-slate-700 font-medium">
+                        {new Date(industry.lastInspectionDate).toLocaleDateString('en-IN')}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-slate-400" />
-                    <span className="text-sm text-slate-600 truncate">{industry.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-slate-400" />
-                    <span className="text-sm text-slate-600">
-                      {industry.employeeCount} employees
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-slate-400" />
-                    <span className="text-sm text-slate-600">
-                      Revenue: {industry.annualRevenue}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Expandable Details */}
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <div className="grid md:grid-cols-3 gap-4 text-xs">
-                  <div>
-                    <p className="text-slate-500 mb-1">Production Capacity</p>
-                    <p className="text-slate-700 font-medium">{industry.productionCapacity}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 mb-1">Environmental Clearance</p>
-                    <p className="text-slate-700 font-medium">{industry.environmentalClearance}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 mb-1">Last Inspection</p>
-                    <p className="text-slate-700 font-medium">
-                      {new Date(industry.lastInspectionDate).toLocaleDateString('en-IN')}
-                    </p>
+                  <div className="mt-3">
+                    <p className="text-slate-500 text-xs mb-1">Certifications</p>
+                    <div className="flex flex-wrap gap-2">
+                      {industry.certifications.map((cert, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded"
+                        >
+                          {cert}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div className="mt-3">
-                  <p className="text-slate-500 text-xs mb-1">Certifications</p>
-                  <div className="flex flex-wrap gap-2">
-                    {industry.certifications.map((cert, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded"
-                      >
-                        {cert}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {filteredIndustries.length === 0 && (

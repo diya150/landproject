@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Maximize2, Download, Calendar, Loader2, MapPin, Eye } from 'lucide-react';
+import { AlertTriangle, Maximize2, Download, Calendar, Loader2, MapPin, Eye, Search, X, MapPinCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { SeverityBadge } from '../components/dashboard/SeverityBadge';
 import { SatelliteMap } from '../components/dashboard/SatelliteMap';
 import { Slider } from '../components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Badge } from '../components/ui/badge';
+import { industriesData } from '../lib/industries-data';
+import { plotsData, getPlotByIndustryId } from '../lib/plots-data';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -19,6 +22,13 @@ export function ChangeDetection() {
   const [satelliteImagery, setSatelliteImagery] = useState(null);
   const [spectralData, setSpectralData] = useState(null);
   const [viewMode, setViewMode] = useState('rgb'); // rgb, ndvi, false-color
+  
+  // Land Allotted feature states
+  const [landSearchTerm, setLandSearchTerm] = useState('');
+  const [selectedIndustry, setSelectedIndustry] = useState(null);
+  const [selectedLandPlot, setSelectedLandPlot] = useState(null);
+  const [showLandDetails, setShowLandDetails] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
 
   // Fetch satellite change detection data
   useEffect(() => {
@@ -77,6 +87,83 @@ export function ChangeDetection() {
 
     fetchImagery();
   }, [selectedPlot, viewMode]);
+
+  // Handle Land Allotted search
+  useEffect(() => {
+    if (!landSearchTerm.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const filteredIndustries = Object.values(industriesData).filter((industry) => {
+      const searchLower = landSearchTerm.toLowerCase();
+      return (
+        industry.companyName.toLowerCase().includes(searchLower) ||
+        industry.registrationNumber.toLowerCase().includes(searchLower) ||
+        industry.plotNumber.toLowerCase().includes(searchLower)
+      );
+    });
+
+    setSearchResults(filteredIndustries);
+  }, [landSearchTerm]);
+
+  // Handle industry selection for Land Allotted
+  const handleSelectIndustry = (industry) => {
+    setSelectedIndustry(industry);
+    const plot = getPlotByIndustryId(industry.registrationNumber);
+    setSelectedLandPlot(plot);
+    setShowLandDetails(false);
+    setLandSearchTerm('');
+    setSearchResults([]);
+  };
+
+  // Helper function to get status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active':
+        return '#dc2626'; // red
+      case 'vacant':
+        return '#d1d5db'; // grey
+      case 'unusable':
+        return '#f59e0b'; // orange
+      case 'disputed':
+        return '#eab308'; // yellow
+      default:
+        return '#3b82f6'; // blue
+    }
+  };
+
+  // Helper function to calculate polygon center
+  const calculatePolygonCenter = (pointsString) => {
+    const coords = pointsString.split(' ').map((point) => {
+      const [x, y] = point.split(',').map(Number);
+      return { x, y };
+    });
+
+    const centerX =
+      coords.reduce((sum, coord) => sum + coord.x, 0) / coords.length;
+    const centerY =
+      coords.reduce((sum, coord) => sum + coord.y, 0) / coords.length;
+
+    return { x: centerX, y: centerY };
+  };
+
+  // Helper function to get industry icon emoji
+  const getIndustryIcon = (industryType) => {
+    const iconMap = {
+      'Steel Manufacturing': '🏭',
+      'Pharmaceutical': '💊',
+      'Information Technology': '💻',
+      'Automotive': '🚗',
+      'Textile': '👕',
+      'Food Processing': '🍱',
+      'Chemical': '⚗️',
+      'Power Generation': '⚡',
+      'Machinery': '⚙️',
+      'Logistics': '📦',
+    };
+    return iconMap[industryType] || '🏢';
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -303,62 +390,263 @@ export function ChangeDetection() {
       </Card>
 
       {/* Map and Quick Stats */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Satellite Map - Left Column */}
-        <div className="lg:col-span-1">
-          <SatelliteMap
-            coordinates={{ latitude: 20.1920, longitude: 81.7196 }}
-            plotId={selectedPlot}
-            title="Plot Location (Satellite View)"
-            height="300px"
-          />
-        </div>
-
-        {/* Quick Reference Stats - Right Columns */}
-        <Card className="border-slate-200">
-          <CardHeader className="border-b border-slate-200 bg-slate-50">
-            <CardTitle className="text-sm font-semibold">Spectral Indices</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="space-y-3">
-              {changeDetectionData?.metrics ? (
-                <>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">NDVI</span>
-                    <span className="font-semibold text-slate-900">
-                      {(changeDetectionData.metrics.ndviChange * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="border-t border-slate-200"></div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">NDBI</span>
-                    <span className="font-semibold text-slate-900">
-                      {(changeDetectionData.metrics.ndbiChange * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="border-t border-slate-200"></div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">MNDWI</span>
-                    <span className="font-semibold text-slate-900">
-                      {(changeDetectionData.metrics.mndwiChange * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="border-t border-slate-200"></div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-600">EVI</span>
-                    <span className="font-semibold text-slate-900">
-                      {(changeDetectionData.metrics.eviChange * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </>
+      <div className={`grid gap-6 ${selectedLandPlot ? 'lg:grid-cols-1' : 'lg:grid-cols-3'}`}>
+        {/* Satellite Map with Land Plot Highlighting */}
+        <div className={selectedLandPlot ? 'lg:col-span-1' : ''}>
+          <Card className="border-slate-200 overflow-hidden">
+            <CardHeader className="border-b border-slate-200 bg-slate-50 pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                {selectedLandPlot ? (
+                  <>
+                    <MapPin className="h-4 w-4 text-red-600" />
+                    {selectedIndustry?.companyName} - Land Plot Map
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Plot Location (Satellite View)
+                  </>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {selectedLandPlot ? (
+                <div className="bg-slate-100 border border-slate-300 rounded-lg overflow-hidden" style={{ height: '500px' }}>
+                  {/* Land Plot Satellite Visualization */}
+                  <svg viewBox="0 0 800 600" className="w-full h-full" style={{backgroundColor: '#e8f4f8'}}>
+                    {/* Satellite Imagery Background */}
+                    <defs>
+                      <pattern id="gridPattern" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d1d5db" strokeWidth="0.5" />
+                      </pattern>
+                      <linearGradient id="riverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#7dd3fc" />
+                        <stop offset="100%" stopColor="#06b6d4" />
+                      </linearGradient>
+                    </defs>
+                    
+                    {/* Grid Background */}
+                    <rect width="800" height="600" fill="url(#gridPattern)" />
+                    
+                    {/* Mahanadi River */}
+                    <path
+                      d="M 0 100 Q 200 120, 400 110 T 800 130"
+                      fill="none"
+                      stroke="url(#riverGradient)"
+                      strokeWidth="25"
+                      opacity="0.7"
+                    />
+                    
+                    {/* Road Networks */}
+                    <g stroke="#9ca3af" strokeWidth="3" opacity="0.6">
+                      <line x1="0" y1="200" x2="800" y2="200" />
+                      <line x1="400" y1="0" x2="400" y2="600" />
+                    </g>
+                    
+                    {/* Satellite Terrain Patches */}
+                    <rect x="50" y="250" width="150" height="150" fill="#86efac" opacity="0.3" />
+                    <rect x="300" y="50" width="200" height="120" fill="#fbbf24" opacity="0.2" />
+                    <rect x="600" y="350" width="180" height="180" fill="#93c5fd" opacity="0.2" />
+                    
+                    {/* Selected Land Plot - HIGHLIGHTED */}
+                    {selectedLandPlot.shape.points && (
+                      <>
+                        {/* Plot Polygon with Bold Highlight */}
+                        <polygon
+                          points={selectedLandPlot.shape.points}
+                          fill={getStatusColor(selectedLandPlot.status)}
+                          fillOpacity="0.4"
+                          stroke={getStatusColor(selectedLandPlot.status)}
+                          strokeWidth="4"
+                          className="drop-shadow-lg"
+                        />
+                        {/* Subtle glow effect */}
+                        <polygon
+                          points={selectedLandPlot.shape.points}
+                          fill="none"
+                          stroke={getStatusColor(selectedLandPlot.status)}
+                          strokeWidth="8"
+                          opacity="0.2"
+                        />
+                        {/* Plot Number Label */}
+                        <text
+                          x={calculatePolygonCenter(selectedLandPlot.shape.points).x}
+                          y={calculatePolygonCenter(selectedLandPlot.shape.points).y}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          className="font-bold text-sm fill-slate-900 drop-shadow"
+                          fontSize="16"
+                          fontWeight="bold"
+                        >
+                          {selectedLandPlot.plotNumber}
+                        </text>
+                        {/* Industry Icon */}
+                        <circle
+                          cx={calculatePolygonCenter(selectedLandPlot.shape.points).x}
+                          cy={calculatePolygonCenter(selectedLandPlot.shape.points).y - 20}
+                          r="18"
+                          fill="white"
+                          stroke="#000"
+                          strokeWidth="2"
+                        />
+                        <text
+                          x={calculatePolygonCenter(selectedLandPlot.shape.points).x}
+                          cy={calculatePolygonCenter(selectedLandPlot.shape.points).y - 20}
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fontSize="18"
+                        >
+                          {getIndustryIcon(selectedLandPlot.industryType)}
+                        </text>
+                      </>
+                    )}
+                  </svg>
+                </div>
               ) : (
-                <div className="text-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto text-slate-400" />
+                <div>
+                  <SatelliteMap
+                    coordinates={{ latitude: 28.6139, longitude: 77.209 }}
+                    plotId={selectedPlot}
+                    title="Plot Location (Satellite View)"
+                    height="300px"
+                  />
                 </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Land Allotted Search Panel - Only show if no land plot selected */}
+        {!selectedLandPlot && (
+          <Card className="border-slate-200 lg:col-span-2">
+            <CardHeader className="border-b border-slate-200 bg-slate-50">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <MapPinCheck className="h-4 w-4" />
+                Land Allotted
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="space-y-4">
+                {/* Search Input */}
+                <div className="relative">
+                  <div className="relative flex items-center">
+                    <Search className="absolute left-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search industry name, plot #, or ID..."
+                      value={landSearchTerm}
+                      onChange={(e) => setLandSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Search Results Dropdown */}
+                  {searchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50">
+                      {searchResults.map((industry) => (
+                        <div
+                          key={industry.registrationNumber}
+                          onClick={() => handleSelectIndustry(industry)}
+                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-b-0 text-sm"
+                        >
+                          <p className="font-semibold text-slate-900">{industry.companyName}</p>
+                          <p className="text-xs text-slate-500">{industry.registrationNumber}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-500 text-center py-4">
+                  Search for an industry to view allotted land details and map
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Selected Industry Info Panel - Show when land plot is selected */}
+        {selectedLandPlot && selectedIndustry && (
+          <Card className="border-slate-200 lg:col-span-2">
+            <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-blue-50 to-blue-100">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-red-600" />
+                  {selectedIndustry.companyName}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedIndustry(null);
+                    setSelectedLandPlot(null);
+                    setLandSearchTerm('');
+                    setSearchResults([]);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Industry Details */}
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold">REGISTRATION ID</p>
+                    <p className="text-sm font-mono text-slate-900">{selectedIndustry.registrationNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold">INDUSTRY TYPE</p>
+                    <p className="text-sm text-slate-900">{selectedIndustry.industryType}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold">COMPLIANCE STATUS</p>
+                    <Badge className="mt-1 bg-green-500">{selectedIndustry.complianceStatus}</Badge>
+                  </div>
+                </div>
+
+                {/* Plot Details */}
+                <div className="space-y-3 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold">PLOT ID</p>
+                    <p className="text-sm font-mono font-bold text-blue-900">{selectedLandPlot.plotNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold">ALLOTTED AREA</p>
+                    <p className="text-sm text-slate-900">{selectedLandPlot.area} hectares</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold">STATUS</p>
+                    <Badge className="mt-1 bg-green-500">{selectedLandPlot.status}</Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <Button
+                  onClick={() => setShowLandDetails(true)}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Full Details
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedIndustry(null);
+                    setSelectedLandPlot(null);
+                    setLandSearchTerm('');
+                  }}
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Analysis Metadata */}
         <Card className="border-slate-200">
@@ -528,6 +816,159 @@ export function ChangeDetection() {
           </CardContent>
         </Card>
       </div>
+      {/* Land Allotted Details Slide-in Panel */}
+      {showLandDetails && selectedIndustry && selectedLandPlot && (
+        <div className="fixed inset-0 z-50">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/30 transition-opacity"
+            onClick={() => setShowLandDetails(false)}
+          />
+
+          {/* Slide-in Panel */}
+          <div className="absolute right-0 top-0 bottom-0 w-full sm:w-[500px] bg-white shadow-2xl transition-transform duration-300 ease-in-out overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <MapPinCheck className="h-5 w-5" />
+                Land Allotment Details
+              </h2>
+              <button
+                onClick={() => setShowLandDetails(false)}
+                className="text-white hover:bg-blue-500 p-1 rounded-full transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Industry Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-600 mb-3">INDUSTRY INFORMATION</h3>
+                <div className="space-y-3 bg-slate-50 p-4 rounded-lg">
+                  <div>
+                    <p className="text-xs text-slate-600">Company Name</p>
+                    <p className="text-sm font-semibold text-slate-900">{selectedIndustry.companyName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600">Registration Number</p>
+                    <p className="text-sm font-mono text-slate-900">{selectedIndustry.registrationNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600">Industry Type</p>
+                    <p className="text-sm text-slate-900">{selectedIndustry.industryType}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600">Compliance Status</p>
+                    <Badge
+                      className={`mt-1 ${
+                        selectedIndustry.complianceStatus === 'Compliant'
+                          ? 'bg-green-500'
+                          : 'bg-yellow-500'
+                      }`}
+                    >
+                      {selectedIndustry.complianceStatus}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600">Compliance Score</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 bg-slate-200 rounded-full h-2">
+                        <div
+                          className="bg-green-500 h-2 rounded-full"
+                          style={{ width: `${selectedIndustry.complianceScore}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-semibold text-slate-900">
+                        {selectedIndustry.complianceScore}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Plot Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-600 mb-3">PLOT INFORMATION</h3>
+                <div className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div>
+                    <p className="text-xs text-slate-600">Plot ID</p>
+                    <p className="text-sm font-mono font-semibold text-blue-900">{selectedLandPlot.plotNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600">Allotted Area</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {selectedLandPlot.area} hectares ({(selectedLandPlot.area * 10000).toFixed(0)} m²)
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600">Land Purpose</p>
+                    <p className="text-sm text-slate-900">Industrial Facility: {selectedLandPlot.industryType}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600">Status</p>
+                    <Badge className="mt-1 bg-green-500">{selectedLandPlot.status}</Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Environmental & Legal */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-600 mb-3">ENVIRONMENTAL & COMPLIANCE</h3>
+                <div className="space-y-3 bg-amber-50 p-4 rounded-lg border border-amber-200">
+                  <div>
+                    <p className="text-xs text-slate-600">Environmental Status</p>
+                    <Badge className="mt-1 bg-blue-500">{selectedLandPlot.environmentalStatus}</Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600">Environmental Clearance Validity</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {selectedIndustry.environmentalClearance?.validUntil || 'Active'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600">Last Inspection Date</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {selectedIndustry.lastInspection || 'No recent inspection'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-600 mb-3">CONTACT INFORMATION</h3>
+                <div className="space-y-2 bg-slate-50 p-4 rounded-lg">
+                  {selectedIndustry.contacts?.primary && (
+                    <div>
+                      <p className="text-xs text-slate-600">Primary Contact</p>
+                      <p className="text-sm text-slate-900">{selectedIndustry.contacts.primary.name}</p>
+                      <p className="text-xs text-slate-500">{selectedIndustry.contacts.primary.phone}</p>
+                    </div>
+                  )}
+                  {selectedIndustry.location && (
+                    <div>
+                      <p className="text-xs text-slate-600">Location</p>
+                      <p className="text-sm text-slate-900">{selectedIndustry.location}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 sticky bottom-0 bg-gradient-to-t from-white pt-4">
+                <Button onClick={() => setShowLandDetails(false)} className="w-full bg-blue-600 hover:bg-blue-700">
+                  View on Map & Close
+                </Button>
+                <Button variant="outline" onClick={() => setShowLandDetails(false)} className="w-full">
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

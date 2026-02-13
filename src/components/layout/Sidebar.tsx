@@ -9,11 +9,13 @@ import {
   Shield,
   Settings,
   LogOut,
-  Building2
+  Building2,
+  MapPin
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Land Monitoring', href: '/land-monitoring', icon: MapPin },
   { name: 'Industries Registry', href: '/industries-registry', icon: Building2 },
   { name: 'Plot Monitoring', href: '/plots', icon: Map },
   { name: 'Violations', href: '/violations', icon: AlertTriangle },

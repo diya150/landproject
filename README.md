@@ -284,5 +284,4 @@ For support or questions, refer to the documentation files:
 ---
 
 **Last Updated**: February 2026
-**Version**: 1.0.0 with Satellite Imagery Support#   l a n d _ c g  
- 
+**Version**: 1.0.0 with Satellite Imagery Support

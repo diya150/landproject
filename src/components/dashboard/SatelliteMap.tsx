@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Rectangle, useMap } from 'react-leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Input } from '../ui/input';
-import { Search, Loader2 } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -49,45 +47,10 @@ export function SatelliteMap({
   title = 'Satellite Map',
   height = '400px'
 }: SatelliteMapProps) {
-  const [searchInput, setSearchInput] = useState('');
-  const [mapCoordinates, setMapCoordinates] = useState(coordinates);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState('');
-
   const defaultCoordinates = { latitude: 20.1920, longitude: 81.7196 };
-  const activeCoordinates = mapCoordinates || defaultCoordinates;
+  const activeCoordinates = coordinates || defaultCoordinates;
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchInput.trim()) return;
-
-    setIsSearching(true);
-    setSearchError('');
-
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchInput)}&limit=1`
-      );
-      const results = await response.json();
-
-      if (results.length > 0) {
-        const { lat, lon, display_name } = results[0];
-        setMapCoordinates({
-          latitude: parseFloat(lat),
-          longitude: parseFloat(lon)
-        });
-        setSearchInput('');
-      } else {
-        setSearchError('Location not found. Try a different search.');
-      }
-    } catch (error) {
-      setSearchError('Error searching for location.');
-      console.error('Search error:', error);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
+  // Create bounds for the area (roughly 2km x 2km)
   const latDelta = 0.02;
   const lonDelta = 0.02;
   const bounds = [
@@ -98,48 +61,10 @@ export function SatelliteMap({
   return (
     <Card className="border-slate-200">
       <CardHeader className="border-b border-slate-200 bg-slate-50">
-        <div className="space-y-3">
-          <CardTitle className="text-lg font-semibold">{title}</CardTitle>
-          
-          {/* Search Form */}
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                type="text"
-                placeholder="Search location (e.g., Naya Raipur, Delhi)..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-10 h-9 bg-white border-slate-300"
-                disabled={isSearching}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isSearching || !searchInput.trim()}
-              className="px-4 h-9 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-slate-300 transition-colors flex items-center gap-2 text-sm font-medium"
-            >
-              {isSearching ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                'Find'
-              )}
-            </button>
-          </form>
-
-          {/* Error Message */}
-          {searchError && (
-            <p className="text-xs text-red-600">{searchError}</p>
-          )}
-        </div>
+        <CardTitle className="text-lg font-semibold">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <MapContainer
-          center={[activeCoordinates.latitude, activeCoordinates.longitude]}
-          zoom={14}
           style={{ height, width: '100%' }}
           className="rounded-b-lg"
         >
@@ -158,7 +83,7 @@ export function SatelliteMap({
           <Rectangle
             bounds={bounds}
             pathOptions={{
-              color: '#037953',
+              color: '#059669',
               weight: 2,
               opacity: 0.8,
               fillOpacity: 0.1,
