@@ -8,11 +8,28 @@ import { EnhancedGISMonitor } from '../components/dashboard/EnhancedGISMonitor';
 import { Slider } from '../components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
-import { industriesData } from '../lib/industries-data';
+import { industriesData, Industry } from '../lib/industries-data';
 import { plotsData, getPlotByIndustryId } from '../lib/plots-data';
 import { getIndustryImagePath } from '../lib/industry-images';
 
 const API_BASE_URL = 'http://localhost:5000/api';
+
+interface ChangeDetectionData {
+  changeDetected: boolean;
+  changeType?: string;
+  confidence?: number;
+  severity?: string;
+  anomalyScore?: number;
+  timeframe?: { daysDifference: number };
+  description?: string;
+  metrics?: {
+    ndviChange: number;
+    ndbiChange: number;
+    mndwiChange: number;
+    eviChange: number;
+  };
+  recommendations?: string[];
+}
 
 export function ChangeDetection() {
   const [comparisonValue, setComparisonValue] = useState([50]);
@@ -20,17 +37,17 @@ export function ChangeDetection() {
   const [selectedPlot, setSelectedPlot] = useState('PLT-2024-001');
   const [beforeDate, setBeforeDate] = useState('2024-01-15');
   const [afterDate, setAfterDate] = useState('2026-02-13');
-  const [changeDetectionData, setChangeDetectionData] = useState(null);
-  const [satelliteImagery, setSatelliteImagery] = useState(null);
+  const [changeDetectionData, setChangeDetectionData] = useState<ChangeDetectionData | null>(null);
+  const [satelliteImagery, setSatelliteImagery] = useState<{ rgb?: any; ndvi?: any; falseColor?: any } | null>(null);
   const [spectralData, setSpectralData] = useState(null);
   const [viewMode, setViewMode] = useState('rgb'); // rgb, ndvi, false-color
   
   // Land Allotted feature states
   const [landSearchTerm, setLandSearchTerm] = useState('');
-  const [selectedIndustry, setSelectedIndustry] = useState(null);
-  const [selectedLandPlot, setSelectedLandPlot] = useState(null);
+  const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(null);
+  const [selectedLandPlot, setSelectedLandPlot] = useState<any>(null);
   const [showLandDetails, setShowLandDetails] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState<typeof industriesData>([]);
 
   // Fetch satellite change detection data
   useEffect(() => {
@@ -110,7 +127,7 @@ export function ChangeDetection() {
   }, [landSearchTerm]);
 
   // Handle industry selection for Land Allotted
-  const handleSelectIndustry = (industry) => {
+  const handleSelectIndustry = (industry: Industry) => {
     setSelectedIndustry(industry);
     const plot = getPlotByIndustryId(industry.id);
     setSelectedLandPlot(plot);
@@ -129,7 +146,7 @@ export function ChangeDetection() {
   };
 
   // Helper function to get status color
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status) {
       case 'active':
         return '#dc2626'; // red
@@ -145,7 +162,7 @@ export function ChangeDetection() {
   };
 
   // Helper function to calculate polygon center
-  const calculatePolygonCenter = (pointsString) => {
+  const calculatePolygonCenter = (pointsString: string) => {
     const coords = pointsString.split(' ').map((point) => {
       const [x, y] = point.split(',').map(Number);
       return { x, y };
@@ -160,8 +177,8 @@ export function ChangeDetection() {
   };
 
   // Helper function to get industry icon emoji
-  const getIndustryIcon = (industryType) => {
-    const iconMap = {
+  const getIndustryIcon = (industryType: string | number) => {
+    const iconMap: Record<string, string> = {
       'Steel Manufacturing': '🏭',
       'Pharmaceutical': '💊',
       'Information Technology': '💻',
@@ -173,7 +190,7 @@ export function ChangeDetection() {
       'Machinery': '⚙️',
       'Logistics': '📦',
     };
-    return iconMap[industryType] || '🏢';
+    return iconMap[String(industryType)] || '🏢';
   };
 
   return (
@@ -289,7 +306,7 @@ export function ChangeDetection() {
                   changeDetectionData?.severity === 'CRITICAL' ? 'critical' :
                   changeDetectionData?.severity === 'HIGH' ? 'high' : 'low'
                 } 
-                size="lg"
+                size="md"
               />
               <span className="font-bold">{changeDetectionData?.severity || 'LOW'}</span>
             </div>
@@ -303,7 +320,7 @@ export function ChangeDetection() {
               {changeDetectionData?.anomalyScore ? `${(changeDetectionData.anomalyScore * 100).toFixed(0)}%` : 'N/A'}
             </p>
             <p className="text-xs text-slate-600 mt-1">
-              {changeDetectionData?.anomalyScore > 0.7 ? 'High anomaly' : 'Normal'}
+              {(changeDetectionData?.anomalyScore ?? 0) > 0.7 ? 'High anomaly' : 'Normal'}
             </p>
           </CardContent>
         </Card>
@@ -429,55 +446,52 @@ export function ChangeDetection() {
             <CardContent className="p-0">
               {selectedLandPlot ? (
                 <div className="bg-slate-100 border border-slate-300 rounded-lg overflow-hidden" style={{ height: '500px' }}>
-                  {/* Land Plot Satellite Visualization */}
+                  {/* Land Plot Map Visualization */}
                   <svg viewBox="0 0 800 600" className="w-full h-full" style={{backgroundColor: '#e8f4f8'}}>
-                    {/* Satellite Imagery Background */}
+                    {/* Defs */}
                     <defs>
-                      <pattern id="gridPattern" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d1d5db" strokeWidth="0.5" />
-                      </pattern>
-                      <linearGradient id="riverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <linearGradient id="riverGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#7dd3fc" />
                         <stop offset="100%" stopColor="#06b6d4" />
                       </linearGradient>
                     </defs>
                     
-                    {/* Grid Background */}
-                    <rect width="800" height="600" fill="url(#gridPattern)" />
+                    {/* Background */}
+                    <rect width="800" height="600" fill="#d2b48c" opacity="0.2" />
                     
-                    {/* Mahanadi River */}
+                    {/* Terrain */}
+                    <rect x="250" y="50" width="300" height="400" fill="#9a8b72" opacity="0.15" />
+                    
+                    {/* River */}
                     <path
-                      d="M 0 100 Q 200 120, 400 110 T 800 130"
+                      d="M 10,0 Q 30,100 20,200 Q 25,300 15,400 Q 35,500 20,600"
+                      stroke="url(#riverGradient2)"
+                      strokeWidth="35"
                       fill="none"
-                      stroke="url(#riverGradient)"
-                      strokeWidth="25"
-                      opacity="0.7"
+                      opacity="0.8"
                     />
                     
-                    {/* Road Networks */}
-                    <g stroke="#9ca3af" strokeWidth="3" opacity="0.6">
-                      <line x1="0" y1="200" x2="800" y2="200" />
-                      <line x1="400" y1="0" x2="400" y2="600" />
+                    {/* Roads */}
+                    <g stroke="#e8e8e8" strokeWidth="8" opacity="0.6">
+                      <line x1="120" y1="0" x2="120" y2="600" />
+                      <line x1="380" y1="0" x2="380" y2="600" />
+                      <line x1="0" y1="140" x2="800" y2="140" />
+                      <line x1="0" y1="280" x2="800" y2="280" />
+                      <line x1="0" y1="420" x2="800" y2="420" />
                     </g>
                     
-                    {/* Satellite Terrain Patches */}
-                    <rect x="50" y="250" width="150" height="150" fill="#86efac" opacity="0.3" />
-                    <rect x="300" y="50" width="200" height="120" fill="#fbbf24" opacity="0.2" />
-                    <rect x="600" y="350" width="180" height="180" fill="#93c5fd" opacity="0.2" />
-                    
-                    {/* Selected Land Plot - HIGHLIGHTED */}
-                    {selectedLandPlot.shape.points && (
+                    {/* Selected Plot - Simple Rendering */}
+                    {selectedLandPlot && selectedLandPlot.shape && selectedLandPlot.shape.type === 'polygon' && selectedLandPlot.shape.points ? (
                       <>
-                        {/* Plot Polygon with Bold Highlight */}
+                        {/* Plot Polygon */}
                         <polygon
                           points={selectedLandPlot.shape.points}
                           fill={getStatusColor(selectedLandPlot.status)}
-                          fillOpacity="0.4"
+                          fillOpacity="0.5"
                           stroke={getStatusColor(selectedLandPlot.status)}
                           strokeWidth="4"
-                          className="drop-shadow-lg"
                         />
-                        {/* Subtle glow effect */}
+                        {/* Glow effect */}
                         <polygon
                           points={selectedLandPlot.shape.points}
                           fill="none"
@@ -485,47 +499,17 @@ export function ChangeDetection() {
                           strokeWidth="8"
                           opacity="0.2"
                         />
-                        {/* Plot Number Label */}
-                        <text
-                          x={calculatePolygonCenter(selectedLandPlot.shape.points).x}
-                          y={calculatePolygonCenter(selectedLandPlot.shape.points).y}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                          className="font-bold text-sm fill-slate-900 drop-shadow"
-                          fontSize="16"
-                          fontWeight="bold"
-                        >
-                          {selectedLandPlot.plotNumber}
-                        </text>
-                        {/* Industry Icon */}
-                        <circle
-                          cx={calculatePolygonCenter(selectedLandPlot.shape.points).x}
-                          cy={calculatePolygonCenter(selectedLandPlot.shape.points).y - 20}
-                          r="18"
-                          fill="white"
-                          stroke="#000"
-                          strokeWidth="2"
-                        />
-                        <text
-                          x={calculatePolygonCenter(selectedLandPlot.shape.points).x}
-                          cy={calculatePolygonCenter(selectedLandPlot.shape.points).y - 20}
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          fontSize="18"
-                        >
-                          {getIndustryIcon(selectedLandPlot.industryType)}
-                        </text>
                       </>
-                    )}
+                    ) : null}
                   </svg>
                 </div>
               ) : (
-                <div>
+                <div style={{ height: '500px' }}>
                   <SatelliteMap
                     coordinates={{ latitude: 28.6139, longitude: 77.209 }}
                     plotId={selectedPlot}
                     title="Plot Location (Satellite View)"
-                    height="300px"
+                    height="500px"
                   />
                 </div>
               )}
@@ -560,34 +544,16 @@ export function ChangeDetection() {
                   {/* Search Results Dropdown */}
                   {searchResults.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50 max-h-72 overflow-y-auto">
-                      {searchResults.map((industry) => {
-                        const imagePath = getIndustryImagePath(industry.id);
-                        return (
-                          <div
-                            key={industry.registrationNumber}
-                            onClick={() => handleSelectIndustry(industry)}
-                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-b-0 text-sm flex items-center gap-3"
-                          >
-                            {/* Industry Image Thumbnail */}
-                            {imagePath && (
-                              <div className="w-12 h-12 flex-shrink-0 bg-slate-200 rounded overflow-hidden">
-                                <img
-                                  src={imagePath}
-                                  alt={industry.companyName}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    e.currentTarget.parentElement!.style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-slate-900 truncate">{industry.companyName}</p>
-                              <p className="text-xs text-slate-500">{industry.registrationNumber}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {searchResults.map((industry) => (
+                        <div
+                          key={industry.registrationNumber}
+                          onClick={() => handleSelectIndustry(industry)}
+                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-b-0 text-sm"
+                        >
+                          <p className="font-semibold text-slate-900">{industry.companyName}</p>
+                          <p className="text-xs text-slate-500">{industry.registrationNumber}</p>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -934,7 +900,7 @@ export function ChangeDetection() {
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                     <p className="text-sm font-semibold text-slate-900 mb-2">🛰️ Satellite Analysis</p>
                     <p className="text-sm text-slate-700">
-                      Data source: Sentinel 2 L2A | Confidence: {(changeDetectionData.confidence * 100).toFixed(0)}%
+                      Data source: Sentinel 2 L2A | Confidence: {((changeDetectionData.confidence ?? 0) * 100).toFixed(0)}%
                     </p>
                   </div>
 
@@ -1102,13 +1068,13 @@ export function ChangeDetection() {
                   <div>
                     <p className="text-xs text-slate-600">Environmental Clearance Validity</p>
                     <p className="text-sm font-semibold text-slate-900">
-                      {selectedIndustry.environmentalClearance?.validUntil || 'Active'}
+                      {typeof selectedIndustry.environmentalClearance === 'object' && selectedIndustry.environmentalClearance?.validUntil ? selectedIndustry.environmentalClearance.validUntil : 'Active'}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600">Last Inspection Date</p>
                     <p className="text-sm font-semibold text-slate-900">
-                      {selectedIndustry.lastInspection || 'No recent inspection'}
+                      {selectedIndustry.lastInspectionDate || 'No recent inspection'}
                     </p>
                   </div>
                 </div>

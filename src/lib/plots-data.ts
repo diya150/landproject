@@ -1,6 +1,8 @@
 // Comprehensive plots dataset with 16 land parcels across Naya Raipur
 // Based on actual satellite imagery of Naya Raipur industrial zones with realistic shapes
 export interface Plot {
+  industryName: any;
+  coordinates: any;
   id: string;
   plotNumber: string;
   status: 'active' | 'vacant' | 'unusable' | 'disputed';

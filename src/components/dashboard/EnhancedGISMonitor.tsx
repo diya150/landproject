@@ -37,6 +37,41 @@ interface PlotFeature {
   };
 }
 
+// Generate GeoJSON features from plots data
+function generatePlotFeatures(): FeatureCollection {
+  const features = plotsData
+    .filter((plot) => {
+      // Only include plots with valid boundary coordinates
+      return plot.boundaryCoordinates && plot.boundaryCoordinates.length >= 3;
+    })
+    .map((plot) => {
+      // Convert boundaryCoordinates (lat/lng) to GeoJSON format (lng/lat)
+      const coordinates = [
+        (plot.boundaryCoordinates || []).map((coord) => [coord.lng, coord.lat]),
+      ];
+
+      return {
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Polygon' as const,
+          coordinates: coordinates.length > 0 && coordinates[0].length >= 3 ? coordinates : [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
+        },
+        properties: {
+          plotId: plot.id,
+          plotNumber: plot.plotNumber,
+          industryName: plot.assignedIndustryName || plot.industryName || 'Unknown',
+          area: plot.area,
+          status: plot.status,
+        },
+      };
+    });
+
+  return {
+    type: 'FeatureCollection',
+    features,
+  };
+}
+
 // Map updater component
 function MapUpdater({
   center,
@@ -99,7 +134,7 @@ function PlotLayer({
   onEachFeature: (feature: any, layer: L.Layer) => void;
 }) {
   const map = useMap();
-  const geoJsonRef = useRef<L.GeoJSON>();
+  const geoJsonRef = useRef<L.GeoJSON>(null);
 
   useEffect(() => {
     if (!map) return;
@@ -158,56 +193,19 @@ function PlotLayer({
 
 export function EnhancedGISMonitor() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIndustry, setSelectedIndustry] = useState(null);
-  const [selectedPlot, setSelectedPlot] = useState(null);
-  const [searchResults, setSearchResults] = useState([]);
+  const [selectedIndustry, setSelectedIndustry] = useState<any>(null);
+  const [selectedPlot, setSelectedPlot] = useState<any>(null);
+  const [searchResults, setSearchResults] = useState<typeof industriesData>([]);
   const [mapCenter, setMapCenter] = useState<[number, number]>([23.1815, 79.9864]); // Central India
   const [mapZoom, setMapZoom] = useState(8);
   const [timeSlider, setTimeSlider] = useState(3); // Today
   const [viewMode, setViewMode] = useState<'rgb' | 'ndvi' | 'falsecolor'>('rgb');
   const [showChangeDetection, setShowChangeDetection] = useState(false);
   const [showMeasurements, setShowMeasurements] = useState(false);
-  const [highlightedPlotId, setHighlightedPlotId] = useState(null);
+  const [highlightedPlotId, setHighlightedPlotId] = useState<string | null>(null);
 
   // Generate GeoJSON features for all plots
-  const generatePlotFeatures = (): FeatureCollection => {
-    const features: PlotFeature[] = plotsData.map((plot) => {
-      const industry = industriesData.find(i => i.id === plot.assignedIndustryId);
-      
-      // Generate random polygon coordinates around India
-      const lat = 23.1815 + (Math.random() - 0.5) * 5;
-      const lon = 79.9864 + (Math.random() - 0.5) * 8;
-      const size = 0.01;
-
-      return {
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [
-            [
-              [lon - size, lat - size],
-              [lon + size, lat - size],
-              [lon + size, lat + size],
-              [lon - size, lat + size],
-              [lon - size, lat - size],
-            ],
-          ],
-        },
-        properties: {
-          plotId: plot.id,
-          plotNumber: plot.plotNumber,
-          industryName: industry?.companyName || 'Unassigned',
-          area: plot.area,
-          status: plot.status,
-        },
-      };
-    });
-
-    return {
-      type: 'FeatureCollection',
-      features: features as any,
-    };
-  };
+  const geoJsonData = generatePlotFeatures();
 
   // Get color based on plot status
   const getStatusColor = (status: string) => {
@@ -249,7 +247,7 @@ export function EnhancedGISMonitor() {
     setSelectedIndustry(industry);
     const plot = getPlotByIndustryId(industry.id);
     setSelectedPlot(plot);
-    setHighlightedPlotId(plot?.id);
+    setHighlightedPlotId(plot?.id ?? null);
     
     // Auto-zoom to plot
     const lat = 23.1815 + (Math.random() - 0.5) * 5;

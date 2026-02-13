@@ -1,4 +1,7 @@
 export interface Industry {
+  contacts: any;
+  complianceScore: ReactNode;
+  complianceScore: any;
   id: string;
   companyName: string;
   registrationNumber: string;
