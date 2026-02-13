@@ -5,6 +5,7 @@ import { StatusBadge } from '../components/dashboard/StatusBadge';
 import { Button } from '../components/ui/button';
 import { industriesData, Industry } from '../lib/industries-data';
 import { getPlotByIndustryId } from '../lib/plots-data';
+import { getIndustryImagePath } from '../lib/industry-images';
 
 export function IndustriesRegistry({ onIndustrySelect }: { onIndustrySelect?: (industryId: string) => void }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -195,7 +196,30 @@ export function IndustriesRegistry({ onIndustrySelect }: { onIndustrySelect?: (i
                 onIndustrySelect?.(industry.id);
               }}
             >
-              <CardContent className="p-6">
+              <CardContent className="p-0">
+                {/* Industry Image - Top Section */}
+                {(() => {
+                  const imagePath = getIndustryImagePath(industry.id);
+                  return imagePath ? (
+                    <div className="relative w-full h-48 bg-slate-200 overflow-hidden rounded-t-lg border-b border-slate-200">
+                      <img
+                        src={imagePath}
+                        alt={industry.companyName}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://via.placeholder.com/800x400?text=' + encodeURIComponent(industry.companyName);
+                        }}
+                      />
+                      <div className="absolute top-2 right-2">
+                        <span className="inline-block bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-semibold text-slate-900">
+                          {industry.industryType}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
+                <div className="p-6">
                 <div className="grid lg:grid-cols-12 gap-6">
                   {/* Main Information */}
                   <div className="lg:col-span-4">
@@ -313,8 +337,7 @@ export function IndustriesRegistry({ onIndustrySelect }: { onIndustrySelect?: (i
                       ))}
                     </div>
                   </div>
-                </div>
-              </CardContent>
+                </div>                </div>              </CardContent>
             </Card>
           );
         })}

@@ -4,11 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { SeverityBadge } from '../components/dashboard/SeverityBadge';
 import { SatelliteMap } from '../components/dashboard/SatelliteMap';
+import { EnhancedGISMonitor } from '../components/dashboard/EnhancedGISMonitor';
 import { Slider } from '../components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
 import { industriesData } from '../lib/industries-data';
 import { plotsData, getPlotByIndustryId } from '../lib/plots-data';
+import { getIndustryImagePath } from '../lib/industry-images';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -95,7 +97,7 @@ export function ChangeDetection() {
       return;
     }
 
-    const filteredIndustries = Object.values(industriesData).filter((industry) => {
+    const filteredIndustries = industriesData.filter((industry) => {
       const searchLower = landSearchTerm.toLowerCase();
       return (
         industry.companyName.toLowerCase().includes(searchLower) ||
@@ -110,8 +112,17 @@ export function ChangeDetection() {
   // Handle industry selection for Land Allotted
   const handleSelectIndustry = (industry) => {
     setSelectedIndustry(industry);
-    const plot = getPlotByIndustryId(industry.registrationNumber);
+    const plot = getPlotByIndustryId(industry.id);
     setSelectedLandPlot(plot);
+    // Auto-load satellite imagery for this plot
+    if (plot) {
+      setSelectedPlot(plot.id);
+      // Set dates to recent for better satellite data
+      const today = new Date();
+      const sixMonthsAgo = new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000);
+      setAfterDate(today.toISOString().split('T')[0]);
+      setBeforeDate(sixMonthsAgo.toISOString().split('T')[0]);
+    }
     setShowLandDetails(false);
     setLandSearchTerm('');
     setSearchResults([]);
@@ -170,8 +181,8 @@ export function ChangeDetection() {
       {/* Header with Controls */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Satellite Change Detection</h1>
-          <p className="text-slate-600">Real-time Sentinel 2 satellite imagery analysis with AI-powered detection</p>
+          <h1 className="text-3xl font-bold text-slate-900">Advanced GIS & Satellite Monitoring</h1>
+          <p className="text-slate-600">Leaflet-powered GIS with Sentinel-2 satellite imagery, change detection & compliance monitoring</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline">
@@ -181,8 +192,14 @@ export function ChangeDetection() {
         </div>
       </div>
 
-      {/* Control Panel */}
+      {/* Enhanced GIS Monitor - Main Monitoring System */}
+      <EnhancedGISMonitor />
+
+      {/* Original Change Detection Controls (Collapsible) */}
       <Card className="border-slate-200 bg-slate-50">
+        <CardHeader className="border-b border-slate-200 bg-slate-100">
+          <CardTitle className="text-lg font-semibold">Advanced Spectral Analysis</CardTitle>
+        </CardHeader>
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
@@ -542,17 +559,35 @@ export function ChangeDetection() {
 
                   {/* Search Results Dropdown */}
                   {searchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50">
-                      {searchResults.map((industry) => (
-                        <div
-                          key={industry.registrationNumber}
-                          onClick={() => handleSelectIndustry(industry)}
-                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-b-0 text-sm"
-                        >
-                          <p className="font-semibold text-slate-900">{industry.companyName}</p>
-                          <p className="text-xs text-slate-500">{industry.registrationNumber}</p>
-                        </div>
-                      ))}
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50 max-h-72 overflow-y-auto">
+                      {searchResults.map((industry) => {
+                        const imagePath = getIndustryImagePath(industry.id);
+                        return (
+                          <div
+                            key={industry.registrationNumber}
+                            onClick={() => handleSelectIndustry(industry)}
+                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-b-0 text-sm flex items-center gap-3"
+                          >
+                            {/* Industry Image Thumbnail */}
+                            {imagePath && (
+                              <div className="w-12 h-12 flex-shrink-0 bg-slate-200 rounded overflow-hidden">
+                                <img
+                                  src={imagePath}
+                                  alt={industry.companyName}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.parentElement!.style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-900 truncate">{industry.companyName}</p>
+                              <p className="text-xs text-slate-500">{industry.registrationNumber}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -589,60 +624,79 @@ export function ChangeDetection() {
               </div>
             </CardHeader>
             <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-4">
-                {/* Industry Details */}
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-slate-600 font-semibold">REGISTRATION ID</p>
-                    <p className="text-sm font-mono text-slate-900">{selectedIndustry.registrationNumber}</p>
+              <div className="space-y-4">
+                {/* Industry Image - Top Section */}
+                {(() => {
+                  const imagePath = getIndustryImagePath(selectedIndustry.id);
+                  return imagePath ? (
+                    <div className="w-full h-40 bg-slate-200 rounded-lg overflow-hidden border border-slate-300 mb-4">
+                      <img
+                        src={imagePath}
+                        alt={selectedIndustry.companyName}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ) : null;
+                })()}
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Industry Details */}
+                  <div className="space-y-3 col-span-2">
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold">REGISTRATION ID</p>
+                      <p className="text-sm font-mono text-slate-900">{selectedIndustry.registrationNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold">INDUSTRY TYPE</p>
+                      <p className="text-sm text-slate-900">{selectedIndustry.industryType}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold">COMPLIANCE STATUS</p>
+                      <Badge className="mt-1 bg-green-500">{selectedIndustry.complianceStatus}</Badge>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 font-semibold">INDUSTRY TYPE</p>
-                    <p className="text-sm text-slate-900">{selectedIndustry.industryType}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600 font-semibold">COMPLIANCE STATUS</p>
-                    <Badge className="mt-1 bg-green-500">{selectedIndustry.complianceStatus}</Badge>
+
+                  {/* Plot Details */}
+                  <div className="space-y-3 bg-blue-50 p-3 rounded-lg border border-blue-200 col-span-2">
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold">PLOT ID</p>
+                      <p className="text-sm font-mono font-bold text-blue-900">{selectedLandPlot.plotNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold">ALLOTTED AREA</p>
+                      <p className="text-sm text-slate-900">{selectedLandPlot.area} hectares</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold">STATUS</p>
+                      <Badge className="mt-1 bg-green-500">{selectedLandPlot.status}</Badge>
+                    </div>
                   </div>
                 </div>
 
-                {/* Plot Details */}
-                <div className="space-y-3 bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <div>
-                    <p className="text-xs text-slate-600 font-semibold">PLOT ID</p>
-                    <p className="text-sm font-mono font-bold text-blue-900">{selectedLandPlot.plotNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600 font-semibold">ALLOTTED AREA</p>
-                    <p className="text-sm text-slate-900">{selectedLandPlot.area} hectares</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600 font-semibold">STATUS</p>
-                    <Badge className="mt-1 bg-green-500">{selectedLandPlot.status}</Badge>
-                  </div>
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <Button
+                    onClick={() => setShowLandDetails(true)}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Full Details
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedIndustry(null);
+                      setSelectedLandPlot(null);
+                      setLandSearchTerm('');
+                    }}
+                  >
+                    Clear Selection
+                  </Button>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                <Button
-                  onClick={() => setShowLandDetails(true)}
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  Full Details
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedIndustry(null);
-                    setSelectedLandPlot(null);
-                    setLandSearchTerm('');
-                  }}
-                >
-                  Clear Selection
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -682,6 +736,130 @@ export function ChangeDetection() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Split Screen: Map + Comparison when plot is selected */}
+      {selectedLandPlot && selectedIndustry && (
+        <Card className="border-emerald-300 shadow-lg">
+          <CardHeader className="border-b border-emerald-300 bg-gradient-to-r from-emerald-50 to-emerald-100">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-emerald-600" />
+                {selectedIndustry.companyName} - {selectedLandPlot.plotNumber}
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedIndustry(null);
+                  setSelectedLandPlot(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="grid lg:grid-cols-3 gap-0">
+              {/* Left: Satellite Map (1/3) */}
+              <div className="lg:col-span-1 border-r border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-900 text-sm mb-3">Location Map</h3>
+                <div className="rounded-lg overflow-hidden border border-slate-300 h-80">
+                  <SatelliteMap
+                    coordinates={{
+                      latitude: selectedLandPlot.latitude || 28.5355,
+                      longitude: selectedLandPlot.longitude || 77.3910,
+                    }}
+                    plotId={selectedLandPlot.id}
+                    industryId={selectedIndustry.id}
+                    industryName={selectedIndustry.companyName}
+                    height="320px"
+                  />
+                </div>
+                <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-blue-900 mb-2">Details</p>
+                  <div className="space-y-1 text-xs text-blue-800">
+                    <p><span className="font-medium">Area:</span> {selectedLandPlot.area} ha</p>
+                    <p><span className="font-medium">Status:</span> {selectedLandPlot.status}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Before/After Comparison (2/3) */}
+              <div className="lg:col-span-2 relative aspect-video bg-slate-900 overflow-hidden">
+                {loading ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
+                    <Loader2 className="h-8 w-8 text-white animate-spin" />
+                  </div>
+                ) : (
+                  <>
+                    {/* Before Image */}
+                    <div 
+                      className="absolute inset-0 overflow-hidden"
+                      style={{ clipPath: `inset(0 ${100 - comparisonValue[0]}% 0 0)` }}
+                    >
+                      <img 
+                        src={satelliteImagery?.rgb?.url || 'https://via.placeholder.com/1200x600?text=Before+Image'}
+                        alt="Before"
+                        className="w-full h-full object-cover brightness-75"
+                      />
+                      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg">
+                        <p className="text-xs font-semibold text-slate-900">BEFORE: {beforeDate}</p>
+                      </div>
+                    </div>
+
+                    {/* After Image */}
+                    <div 
+                      className="absolute inset-0 overflow-hidden"
+                      style={{ clipPath: `inset(0 0 0 ${comparisonValue[0]}%)` }}
+                    >
+                      <img 
+                        src={
+                          viewMode === 'ndvi' ? satelliteImagery?.ndvi?.url :
+                          viewMode === 'false-color' ? satelliteImagery?.falseColor?.url :
+                          satelliteImagery?.rgb?.url || 'https://via.placeholder.com/1200x600?text=After+Image'
+                        }
+                        alt="After"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg">
+                        <p className="text-xs font-semibold text-slate-900">AFTER: {afterDate}</p>
+                      </div>
+                    </div>
+
+                    {/* Slider Line */}
+                    <div 
+                      className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize"
+                      style={{ left: `${comparisonValue[0]}%` }}
+                    >
+                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 h-12 w-12 bg-white rounded-full shadow-lg flex items-center justify-center">
+                        <div className="flex gap-1">
+                          <div className="w-0.5 h-6 bg-slate-400"></div>
+                          <div className="w-0.5 h-6 bg-slate-400"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Slider Control */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200">
+              <Slider 
+                value={comparisonValue}
+                onValueChange={setComparisonValue}
+                max={100}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between mt-2">
+                <span className="text-xs text-slate-600">Before ({beforeDate})</span>
+                <span className="text-xs text-slate-600">After ({afterDate})</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Change Analysis Results */}
       <div className="grid lg:grid-cols-2 gap-6">

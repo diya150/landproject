@@ -11,6 +11,7 @@ const config = require('./config/config');
 const plotRoutes = require('./routes/plotRoutes');
 const analysisRoutes = require('./routes/analysisRoutes');
 const satelliteRoutes = require('./routes/satelliteRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 
 // Initialize Express app
 const app = express();
@@ -40,6 +41,7 @@ app.get('/health', (req, res) => {
 app.use('/api/plots', plotRoutes);
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/satellite', satelliteRoutes);
+app.use('/api/search', searchRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
