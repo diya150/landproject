@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { MapPin, Building2, TrendingUp, AlertCircle } from 'lucide-react';
 import PlotMonitoringMap from '../components/PlotMonitoringMap';
 import NayaRaipurMap from '../components/NayaRaipurMap';
+import RawabhataMap from '../components/RawabhataMap';
 import { IndustriesRegistry } from './IndustriesRegistry';
 import { industriesData } from '../lib/industries-data';
 import { plotsData, getPlotsStatistics } from '../lib/plots-data';
@@ -164,9 +165,20 @@ export function LandMonitoringDashboard() {
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900 mb-4">
-                    Geographic Context - Naya Raipur, Chhattisgarh
+                    Geographic Context - Industrial Regions
                   </h2>
-                  <NayaRaipurMap />
+                  
+                  {/* Naya Raipur Region */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-slate-700 mb-3">Naya Raipur Area</h3>
+                    <NayaRaipurMap />
+                  </div>
+                  
+                  {/* Rawabhata Region */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-700 mb-3">Rawabhata Area</h3>
+                    <RawabhataMap />
+                  </div>
                 </div>
 
                 {/* Land Statistics */}

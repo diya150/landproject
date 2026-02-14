@@ -1,0 +1,174 @@
+{
+  "name": "Abhanpur Industrial Region - Plotted Map",
+  "metadata": {
+    "region": "Abhanpur",
+    "totalPlots": 42,
+    "source": "Official Survey Records 2024",
+    "uploadDate": "2026-02-14",
+    "accuracy": "±5m",
+    "datum": "WGS84",
+    "description": "Registered plotted map data for Abhanpur industrial area"
+  },
+  "bounds": {
+    "north": 21.0689,
+    "south": 21.0640,
+    "east": 81.7420,
+    "west": 81.7383
+  },
+  "plots": [
+    {
+      "id": 1,
+      "plotNumber": "A-001",
+      "area": 2500,
+      "coordinates": [
+        [21.0665, 81.7390],
+        [21.0668, 81.7390],
+        [21.0668, 81.7393],
+        [21.0665, 81.7393]
+      ],
+      "owner": "Bhilai Steel Manufacturing Ltd.",
+      "status": "active",
+      "registrationDate": "2020-03-15",
+      "compliance": "violation"
+    },
+    {
+      "id": 2,
+      "plotNumber": "A-002",
+      "area": 2200,
+      "coordinates": [
+        [21.0662, 81.7390],
+        [21.0665, 81.7390],
+        [21.0665, 81.7393],
+        [21.0662, 81.7393]
+      ],
+      "owner": "Mahadev Textile Mills",
+      "status": "active",
+      "registrationDate": "2019-08-20",
+      "compliance": "compliant"
+    },
+    {
+      "id": 3,
+      "plotNumber": "A-003",
+      "area": 2800,
+      "coordinates": [
+        [21.0659, 81.7390],
+        [21.0662, 81.7390],
+        [21.0662, 81.7393],
+        [21.0659, 81.7393]
+      ],
+      "owner": "Sarda Energy and Minerals Ltd",
+      "status": "active",
+      "registrationDate": "2021-01-10",
+      "compliance": "under-review"
+    },
+    {
+      "id": 4,
+      "plotNumber": "A-004",
+      "area": 2100,
+      "coordinates": [
+        [21.0656, 81.7390],
+        [21.0659, 81.7390],
+        [21.0659, 81.7393],
+        [21.0656, 81.7393]
+      ],
+      "owner": "Vacant Plot",
+      "status": "vacant",
+      "registrationDate": "2023-06-01",
+      "compliance": "compliant"
+    },
+    {
+      "id": 5,
+      "plotNumber": "A-005",
+      "area": 3000,
+      "coordinates": [
+        [21.0665, 81.7393],
+        [21.0668, 81.7393],
+        [21.0668, 81.7396],
+        [21.0665, 81.7396]
+      ],
+      "owner": "Chhattisgarh Pharma Industries",
+      "status": "active",
+      "registrationDate": "2020-11-05",
+      "compliance": "violation"
+    },
+    {
+      "id": 6,
+      "plotNumber": "A-006",
+      "area": 1950,
+      "coordinates": [
+        [21.0662, 81.7393],
+        [21.0665, 81.7393],
+        [21.0665, 81.7396],
+        [21.0662, 81.7396]
+      ],
+      "owner": "ChemTech Industries Pvt. Ltd.",
+      "status": "active",
+      "registrationDate": "2022-04-12",
+      "compliance": "compliant"
+    }
+  ],
+  "roads": [
+    {
+      "id": "ROAD-001",
+      "name": "Industrial Main Road",
+      "type": "primary",
+      "coordinates": [
+        [21.0640, 81.7383],
+        [21.0689, 81.7383]
+      ],
+      "width": 15
+    },
+    {
+      "id": "ROAD-002",
+      "name": "Secondary Access Road",
+      "type": "secondary",
+      "coordinates": [
+        [21.0640, 81.7390],
+        [21.0689, 81.7390]
+      ],
+      "width": 12
+    },
+    {
+      "id": "ROAD-003",
+      "name": "Internal Ring Road",
+      "type": "tertiary",
+      "coordinates": [
+        [21.0640, 81.7410],
+        [21.0689, 81.7410]
+      ],
+      "width": 10
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "LM-001",
+      "name": "Main Gate",
+      "type": "entry",
+      "coordinates": [21.0665, 81.7385],
+      "description": "Primary entrance to industrial area"
+    },
+    {
+      "id": "LM-002",
+      "name": "Administrative Building",
+      "type": "structure",
+      "coordinates": [21.0670, 81.7395],
+      "description": "Central administrative office"
+    },
+    {
+      "id": "LM-003",
+      "name": "Waste Management Facility",
+      "type": "utility",
+      "coordinates": [21.0650, 81.7415],
+      "description": "Common waste treatment facility"
+    }
+  ],
+  "statistics": {
+    "totalArea": 98600,
+    "occupiedPlots": 5,
+    "vacantPlots": 1,
+    "averagePlotSize": 2425,
+    "complianceRate": 50,
+    "violationCount": 2,
+    "reviewCount": 1
+  }
+}

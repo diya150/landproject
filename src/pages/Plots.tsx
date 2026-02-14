@@ -3,6 +3,7 @@ import { MapPin } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import PlotMonitoringMap from '../components/PlotMonitoringMap';
 import NayaRaipurMap from '../components/NayaRaipurMap';
+import RawabhataMap from '../components/RawabhataMap';
 
 export function Plots() {
   const [selectedIndustryId, setSelectedIndustryId] = useState<string | null>(null);
@@ -24,10 +25,15 @@ export function Plots() {
         onIndustrySelect={(industryId) => setSelectedIndustryId(industryId)}
       />
 
-      {/* Naya Raipur Geographic Overview */}
-      <div>
+      {/* Geographic Overview - Multiple Regions */}
+      <div className="space-y-6">
         <h2 className="text-2xl font-bold text-slate-900 mb-4">Geographic Context</h2>
+        
+        {/* Naya Raipur */}
         <NayaRaipurMap />
+        
+        {/* Rawabhata */}
+        <RawabhataMap />
       </div>
 
       {/* Information Panel */}

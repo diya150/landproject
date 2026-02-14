@@ -1,0 +1,174 @@
+{
+  "name": "Rawabhata Industrial Region - Plotted Map",
+  "metadata": {
+    "region": "Rawabhata",
+    "totalPlots": 65,
+    "source": "Official Survey Records 2024",
+    "uploadDate": "2026-02-14",
+    "accuracy": "±5m",
+    "datum": "WGS84",
+    "description": "Grid-style registered plotted map data for Rawabhata industrial area"
+  },
+  "bounds": {
+    "north": 21.3175,
+    "south": 21.3130,
+    "east": 81.6480,
+    "west": 81.6420
+  },
+  "plots": [
+    {
+      "id": 1,
+      "plotNumber": "R-001",
+      "area": 1800,
+      "coordinates": [
+        [21.3153, 81.6445],
+        [21.3156, 81.6445],
+        [21.3156, 81.6448],
+        [21.3153, 81.6448]
+      ],
+      "owner": "Industrial Plot A",
+      "status": "active",
+      "registrationDate": "2021-01-15",
+      "compliance": "compliant"
+    },
+    {
+      "id": 2,
+      "plotNumber": "R-002",
+      "area": 1800,
+      "coordinates": [
+        [21.3153, 81.6448],
+        [21.3156, 81.6448],
+        [21.3156, 81.6451],
+        [21.3153, 81.6451]
+      ],
+      "owner": "Industrial Plot B",
+      "status": "active",
+      "registrationDate": "2021-02-20",
+      "compliance": "compliant"
+    },
+    {
+      "id": 3,
+      "plotNumber": "R-003",
+      "area": 1800,
+      "coordinates": [
+        [21.3150, 81.6445],
+        [21.3153, 81.6445],
+        [21.3153, 81.6448],
+        [21.3150, 81.6448]
+      ],
+      "owner": "Industrial Plot C",
+      "status": "active",
+      "registrationDate": "2021-03-10",
+      "compliance": "compliant"
+    },
+    {
+      "id": 4,
+      "plotNumber": "R-004",
+      "area": 1800,
+      "coordinates": [
+        [21.3150, 81.6448],
+        [21.3153, 81.6448],
+        [21.3153, 81.6451],
+        [21.3150, 81.6451]
+      ],
+      "owner": "Industrial Plot D",
+      "status": "active",
+      "registrationDate": "2021-04-05",
+      "compliance": "violation"
+    },
+    {
+      "id": 5,
+      "plotNumber": "R-005",
+      "area": 1800,
+      "coordinates": [
+        [21.3147, 81.6445],
+        [21.3150, 81.6445],
+        [21.3150, 81.6448],
+        [21.3147, 81.6448]
+      ],
+      "owner": "Industrial Plot E",
+      "status": "active",
+      "registrationDate": "2021-05-15",
+      "compliance": "compliant"
+    },
+    {
+      "id": 6,
+      "plotNumber": "R-006",
+      "area": 1800,
+      "coordinates": [
+        [21.3147, 81.6448],
+        [21.3150, 81.6448],
+        [21.3150, 81.6451],
+        [21.3147, 81.6451]
+      ],
+      "owner": "Industrial Plot F",
+      "status": "vacant",
+      "registrationDate": "2021-06-20",
+      "compliance": "compliant"
+    }
+  ],
+  "roads": [
+    {
+      "id": "ROAD-R1",
+      "name": "Rawabhata Main Highway",
+      "type": "primary",
+      "coordinates": [
+        [21.3130, 81.6420],
+        [21.3175, 81.6420]
+      ],
+      "width": 20
+    },
+    {
+      "id": "ROAD-R2",
+      "name": "Rawabhata Secondary Road",
+      "type": "secondary",
+      "coordinates": [
+        [21.3130, 81.6440],
+        [21.3175, 81.6440]
+      ],
+      "width": 15
+    },
+    {
+      "id": "ROAD-R3",
+      "name": "Service Lane",
+      "type": "tertiary",
+      "coordinates": [
+        [21.3130, 81.6460],
+        [21.3175, 81.6460]
+      ],
+      "width": 8
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "LM-R1",
+      "name": "Rawabhata Regional Gate",
+      "type": "entry",
+      "coordinates": [21.3153, 81.6420],
+      "description": "Main entry point to Rawabhata zone"
+    },
+    {
+      "id": "LM-R2",
+      "name": "Regional Admin Center",
+      "type": "structure",
+      "coordinates": [21.3160, 81.6450],
+      "description": "Regional administration office"
+    },
+    {
+      "id": "LM-R3",
+      "name": "Power Substation",
+      "type": "utility",
+      "coordinates": [21.3140, 81.6470],
+      "description": "Main power distribution center"
+    }
+  ],
+  "statistics": {
+    "totalArea": 10800,
+    "occupiedPlots": 5,
+    "vacantPlots": 1,
+    "averagePlotSize": 1800,
+    "complianceRate": 83,
+    "violationCount": 1,
+    "reviewCount": 0
+  }
+}

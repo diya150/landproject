@@ -5,7 +5,6 @@ import { Button } from '../components/ui/button';
 import { SatelliteMap } from '../components/dashboard/SatelliteMap';
 import { industriesData } from '../lib/industries-data';
 import { blockchainService } from '../services/blockchainService';
-import GoogleMapReact from 'google-map-react';
 
 
 
@@ -47,6 +46,76 @@ const INDUSTRIAL_REGIONS = {
   }
 };
 
+// Generate grid plots for a region
+const generateGridPlots = (regionKey: string): Array<{
+  id: string;
+  name: string;
+  label: string;
+  coordinates: Array<[number, number]>;
+  style: {
+    color: string;
+    fillColor: string;
+    fillOpacity: number;
+    weight: number;
+  };
+  meta?: Record<string, string>;
+}> => {
+  const region = INDUSTRIAL_REGIONS[regionKey as keyof typeof INDUSTRIAL_REGIONS];
+  if (!region) return [];
+
+  const colors = ['#ff4444', '#ffbb33', '#ffddaa']; // red, yellow, light orange
+  const statuses = ['Occupied', 'Vacant'];
+  const rows = 5;
+  const cols = 6;
+  const plots = [];
+
+  const latStep = (region.bounds.north - region.bounds.south) / rows;
+  const lngStep = (region.bounds.east - region.bounds.west) / cols;
+
+  let plotNumber = 1;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const south = region.bounds.south + (row * latStep);
+      const north = south + latStep;
+      const west = region.bounds.west + (col * lngStep);
+      const east = west + lngStep;
+
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+      const randomArea = (Math.random() * 1.5 + 0.5).toFixed(2); // 0.5 to 2.0 hectares
+
+      plots.push({
+        id: `${regionKey}-plot-${plotNumber}`,
+        name: `Plot ${plotNumber}`,
+        label: `${plotNumber}`,
+        coordinates: [
+          [south, west],
+          [north, west],
+          [north, east],
+          [south, east],
+          [south, west] // close polygon
+        ] as Array<[number, number]>,
+        style: {
+          color: '#333333',
+          fillColor: randomColor,
+          fillOpacity: 0.5,
+          weight: 2
+        },
+        meta: {
+          'Region': region.name,
+          'Plot Area': `${randomArea} hectares`,
+          'Status': randomStatus,
+          'Zone': regionKey.charAt(0).toUpperCase() + regionKey.slice(1)
+        }
+      });
+
+      plotNumber++;
+    }
+  }
+
+  return plots;
+};
+
 export function ChangeDetection() {
   const [selectedRegion, setSelectedRegion] = useState('abhanpur');
   const [mapFocus, setMapFocus] = useState<'all' | 'selected'>('all');
@@ -71,10 +140,6 @@ export function ChangeDetection() {
     date: string;
     status: string;
   }>>([]);
-  
-  // Google Map state
-  const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
-  const [googleMapReady, setGoogleMapReady] = useState(false);
 
   // Industry coordinates mapping (Raipur area)
   const industryCoordinates: Record<string, {lat: number; lng: number}> = {
@@ -105,10 +170,6 @@ export function ChangeDetection() {
     'Ulakiya Industry': { lat: 21.0658, lng: 81.7388 },
     'KESDA (Industrial Estate)': { lat: 21.0670, lng: 81.7420 },
     'Beekay Engineering Corporation': { lat: 21.0646, lng: 81.7394 },
-  };
-
-  const getIndustryCoordinates = (companyName: string) => {
-    return industryCoordinates[companyName] || { lat: 21.0665, lng: 81.7399 };
   };
 
   const handleRegionChange = (region: string) => {
@@ -185,18 +246,35 @@ export function ChangeDetection() {
         details: complaintReason
       });
 
-      // Store complaint locally
+      // Store complaint locally and in localStorage
       const newComplaint = {
         id: blockchainResult.blockchain.hash,
         companyName: selectedCompanyForComplaint,
+        industry: selectedCompanyForComplaint,
         reason: complaintReason,
         date: new Date().toLocaleDateString(),
-        status: 'Recorded on Blockchain',
+        status: 'pending',
         blockchainHash: blockchainResult.blockchain.hash,
-        blockNumber: blockchainResult.blockchain.blockNumber
+        blockNumber: blockchainResult.blockchain.blockNumber,
+        plotId: company?.id || 'N/A',
+        severity: 'high',
+        dateDetected: new Date().toLocaleDateString(),
+        description: complaintReason,
+        type: 'complaint'
       };
 
-      setComplaints([...complaints, newComplaint]);
+      const updatedComplaints = [...complaints, newComplaint];
+      setComplaints(updatedComplaints);
+
+      // Save to localStorage for Violations page
+      try {
+        const existingViolations = JSON.parse(localStorage.getItem('violations') || '[]');
+        existingViolations.push(newComplaint);
+        localStorage.setItem('violations', JSON.stringify(existingViolations));
+      } catch (e) {
+        console.error('Error saving to localStorage:', e);
+      }
+
       setBlockchainStatus({
         status: 'success',
         hash: blockchainResult.blockchain.hash,
@@ -261,6 +339,11 @@ export function ChangeDetection() {
     ]
   ];
 
+  // Generate grid plots for the map
+  const gridPlots = mapFocus === 'all' 
+    ? [...generateGridPlots('abhanpur'), ...generateGridPlots('rawabhata')]
+    : generateGridPlots(selectedRegion);
+
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">
       <div className="mx-auto max-w-7xl">
@@ -292,6 +375,16 @@ export function ChangeDetection() {
           >
             🖼️ Visual Compare
           </button>
+          <button
+            onClick={() => setActiveTab('complaint')}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
+              activeTab === 'complaint'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📝 Raise Complaint
+          </button>
         </div>
 
         {/* Tab Content: Survey Comparison */}
@@ -305,6 +398,7 @@ export function ChangeDetection() {
               zoom={regionData.zoom}
               bounds={mapFocus === 'all' ? combinedBounds : undefined}
               markers={regionMarkers}
+              polygons={gridPlots}
               industryName={regionData.name}
             />
           </div>
@@ -600,61 +694,9 @@ export function ChangeDetection() {
             </Card>
           </div>
 
-          {/* Split View: Satellite Map + Industry Photos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left: Google Map with Industry Markers */}
-            <Card className="h-96">
-              <CardHeader>
-                <CardTitle className="text-base">🗺️ Google Map View - Search Results</CardTitle>
-              </CardHeader>
-              <CardContent className="h-80 p-0">
-                {(() => {
-                  const matchedIndustries = searchQuery
-                    ? industriesData.filter(industry => 
-                        industry.companyName.toLowerCase().includes(searchQuery) ||
-                        industry.industryType.toLowerCase().includes(searchQuery) ||
-                        industry.location.toLowerCase().includes(searchQuery)
-                      )
-                    : industriesData.slice(0, 10);
-
-                  const mapCenter = matchedIndustries.length > 0 
-                    ? getIndustryCoordinates(matchedIndustries[0].companyName)
-                    : { lat: 21.0665, lng: 81.7399 };
-
-                  return (
-                    <div className="w-full h-full bg-gray-100 relative">
-                      <GoogleMapReact
-                        bootstrapURLKeys={{ key: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyC-qM2j4nPjJGaLJADYfR-VYSFvZ-QHoXo' }}
-                        center={mapCenter}
-                        defaultZoom={15}
-                        yesIWantToUseGoogleMapApiInternals
-                      >
-                        {matchedIndustries.map((industry) => {
-                          const coords = getIndustryCoordinates(industry.companyName);
-                          return (
-                            <MarkerComponent
-                              key={industry.id}
-                              id={industry.id}
-                              companyName={industry.companyName}
-                              isSelected={selectedMarker === industry.id}
-                              lat={coords.lat}
-                              lng={coords.lng}
-                            />
-                          );
-                        })}
-                      </GoogleMapReact>
-                      {matchedIndustries.length > 0 && (
-                        <div className="absolute top-2 left-2 bg-white px-3 py-2 rounded shadow text-xs text-gray-700 z-10">
-                          {matchedIndustries.length} location{matchedIndustries.length !== 1 ? 's' : ''} found
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-
-            {/* Right: Industry Photos Grid */}
+          {/* Industry Photos */}
+          <div>
+            {/* Industry Photos Grid */}
             <Card className="h-96 overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-base">🖼️ Industry Photos</CardTitle>
@@ -791,6 +833,112 @@ export function ChangeDetection() {
                   </tbody>
                 </table>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+        )}
+
+        {/* Tab Content: Raise Complaint */}
+        {activeTab === 'complaint' && (
+        <div className="space-y-6">
+          {/* Complaint Form */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">📝 Raise a Complaint</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Company
+                </label>
+                <select
+                  value={selectedCompanyForComplaint}
+                  onChange={(e) => setSelectedCompanyForComplaint(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Select Company --</option>
+                  {industriesData.map((industry) => (
+                    <option key={industry.id} value={industry.companyName}>
+                      {industry.companyName} ({industry.industryType})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Complaint Reason / Description
+                </label>
+                <textarea
+                  value={complaintReason}
+                  onChange={(e) => setComplaintReason(e.target.value)}
+                  rows={5}
+                  placeholder="Enter detailed reason for complaint..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <Button
+                onClick={handleRaiseComplaint}
+                disabled={isSubmittingBlockchain || !selectedCompanyForComplaint || !complaintReason.trim()}
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isSubmittingBlockchain ? 'Submitting...' : '📢 Submit Complaint'}
+              </Button>
+
+              {blockchainStatus && (
+                <div className={`p-4 rounded-lg ${
+                  blockchainStatus.status === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                }`}>
+                  {blockchainStatus.status === 'success' ? (
+                    <div className="text-sm text-green-800">
+                      <p className="font-semibold mb-2">✓ Complaint Successfully Recorded!</p>
+                      <p>Company: {blockchainStatus.companyName}</p>
+                      <p>Block Number: {blockchainStatus.blockNumber}</p>
+                      <p>Hash: {blockchainStatus.hash.substring(0, 20)}...</p>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-red-800">
+                      <p className="font-semibold mb-2">✗ Error</p>
+                      <p>{blockchainStatus.error}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Complaints */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Recent Complaints</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {complaints.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No complaints raised yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {complaints.map((complaint) => (
+                    <div key={complaint.id} className="p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-gray-900">{complaint.companyName}</h3>
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                          {complaint.status}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">{complaint.reason}</p>
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>{complaint.date}</span>
+                        {complaint.blockchainHash && (
+                          <span className="font-mono">
+                            Block: {complaint.blockNumber}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { Search, Filter, Download, Building2, MapPin, Phone, Mail, TrendingUp, Users, Calendar, FileCheck, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { StatusBadge } from '../components/dashboard/StatusBadge';
@@ -13,6 +14,7 @@ export function IndustriesRegistry({ onIndustrySelect }: { onIndustrySelect?: (i
   const [filterIndustry, setFilterIndustry] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedIndustryId, setSelectedIndustryId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // Get unique districts and industry types
   const districts = ['All', ...Array.from(new Set(industriesData.map(ind => ind.district)))];
@@ -298,6 +300,8 @@ export function IndustriesRegistry({ onIndustrySelect }: { onIndustrySelect?: (i
                         e.stopPropagation();
                         setSelectedIndustryId(industry.id);
                         onIndustrySelect?.(industry.id);
+                        // Navigate to land-monitoring page with the selected industry
+                        navigate(`/land-monitoring?industryId=${industry.id}`);
                       }}
                     >
                       <Eye className="h-4 w-4 mr-1" />

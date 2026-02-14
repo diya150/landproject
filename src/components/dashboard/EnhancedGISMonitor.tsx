@@ -199,9 +199,8 @@ export function EnhancedGISMonitor() {
   const [mapCenter, setMapCenter] = useState<[number, number]>([23.1815, 79.9864]); // Central India
   const [mapZoom, setMapZoom] = useState(8);
   const [timeSlider, setTimeSlider] = useState(3); // Today
-  const [viewMode, setViewMode] = useState<'rgb' | 'ndvi' | 'falsecolor'>('rgb');
-  const [showChangeDetection, setShowChangeDetection] = useState(false);
-  const [showMeasurements, setShowMeasurements] = useState(false);
+  const [monitoringMode, setMonitoringMode] = useState<'live' | 'compare' | 'detection' | 'violations' | 'boundaries'>('live');
+  const [showViolationAlerts, setShowViolationAlerts] = useState(false);
   const [highlightedPlotId, setHighlightedPlotId] = useState<string | null>(null);
 
   // Generate GeoJSON features for all plots
@@ -272,14 +271,24 @@ export function EnhancedGISMonitor() {
     }
   };
 
-  // Get tile URL based on view mode
+  // Get tile URL based on monitoring mode
   const getTileUrl = () => {
-    switch (viewMode) {
-      case 'ndvi':
+    switch (monitoringMode) {
+      case 'detection':
+        // NDVI layer for change detection
         return 'https://gibs.earthdata.nasa.gov/wmts-webmerc/MODIS_Terra_Corrected_Reflectance_TrueColor/default//GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg';
-      case 'falsecolor':
-        return 'https://gibs.earthdata.nasa.gov/wmts-webmerc/MODIS_Terra_CorrectedReflectance_Bands367/default//GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg';
+      case 'compare':
+        // High-resolution satellite for comparison
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      case 'boundaries':
+        // Topo map for clear boundary visualization
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
+      case 'violations':
+        // Standard satellite for violations overlay
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      case 'live':
       default:
+        // Latest Sentinel-2 imagery
         return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
     }
   };
@@ -340,47 +349,47 @@ export function EnhancedGISMonitor() {
               </div>
             </div>
 
-            {/* Control Buttons */}
+            {/* Monitoring Mode Buttons */}
             <div className="flex flex-wrap gap-2">
               <Button
-                variant={viewMode === 'rgb' ? 'default' : 'outline'}
+                variant={monitoringMode === 'live' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('rgb')}
+                onClick={() => setMonitoringMode('live')}
               >
                 <Eye className="h-4 w-4 mr-1" />
-                RGB True Color
+                Live Monitoring
               </Button>
               <Button
-                variant={viewMode === 'ndvi' ? 'default' : 'outline'}
+                variant={monitoringMode === 'compare' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('ndvi')}
+                onClick={() => setMonitoringMode('compare')}
               >
                 <Zap className="h-4 w-4 mr-1" />
-                NDVI Vegetation
+                Compare Dates
               </Button>
               <Button
-                variant={viewMode === 'falsecolor' ? 'default' : 'outline'}
+                variant={monitoringMode === 'detection' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setViewMode('falsecolor')}
-              >
-                <Zap className="h-4 w-4 mr-1" />
-                False Color
-              </Button>
-              <Button
-                variant={showChangeDetection ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setShowChangeDetection(!showChangeDetection)}
+                onClick={() => setMonitoringMode('detection')}
               >
                 <AlertTriangle className="h-4 w-4 mr-1" />
                 Change Detection
               </Button>
               <Button
-                variant={showMeasurements ? 'default' : 'outline'}
+                variant={monitoringMode === 'violations' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setShowMeasurements(!showMeasurements)}
+                onClick={() => setMonitoringMode('violations')}
               >
-                <Ruler className="h-4 w-4 mr-1" />
-                Measurements
+                <AlertCircle className="h-4 w-4 mr-1" />
+                Violations / Alerts
+              </Button>
+              <Button
+                variant={monitoringMode === 'boundaries' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMonitoringMode('boundaries')}
+              >
+                <MapPin className="h-4 w-4 mr-1" />
+                Plot Boundaries
               </Button>
             </div>
 
@@ -424,10 +433,10 @@ export function EnhancedGISMonitor() {
                   zoom={mapZoom}
                   style={{ height: '100%', width: '100%' }}
                 >
-                  {/* Base Satellite Layer - Changes based on view mode */}
+                  {/* Base Satellite Layer - Changes based on monitoring mode */}
                   <TileLayer
                     url={getTileUrl()}
-                    attribution={viewMode === 'ndvi' ? '&copy; NASA GIBS' : viewMode === 'falsecolor' ? '&copy; NASA GIBS' : '&copy; Esri, DigitalGlobe'}
+                    attribution={monitoringMode === 'detection' ? '&copy; NASA GIBS' : monitoringMode === 'boundaries' ? '&copy; Esri' : '&copy; Esri, DigitalGlobe'}
                     maxZoom={20}
                   />
 
@@ -442,8 +451,8 @@ export function EnhancedGISMonitor() {
                     onEachFeature={onEachFeature}
                   />
 
-                  {/* Change Detection Overlay - Red circles for anomalies */}
-                  {showChangeDetection && selectedPlot && (
+                  {/* Violation Alerts Overlay - Show when violations mode active */}
+                  {monitoringMode === 'violations' && selectedPlot && (
                     <>
                       <Marker position={[mapCenter[0] + 0.02, mapCenter[1] + 0.01]}>
                         <Popup>
@@ -458,6 +467,28 @@ export function EnhancedGISMonitor() {
                           <div className="text-xs">
                             <p className="font-semibold text-orange-600">🌱 Vegetation Loss Area</p>
                             <p>12% vegetation decrease</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    </>
+                  )}
+
+                  {/* Change Detection Markers - Show when detection mode active */}
+                  {monitoringMode === 'detection' && selectedPlot && (
+                    <>
+                      <Marker position={[mapCenter[0] + 0.02, mapCenter[1] + 0.01]}>
+                        <Popup>
+                          <div className="text-xs">
+                            <p className="font-semibold text-red-600">🔴 Change Detected</p>
+                            <p>NDVI change: -12%</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                      <Marker position={[mapCenter[0] - 0.015, mapCenter[1] - 0.02]}>
+                        <Popup>
+                          <div className="text-xs">
+                            <p className="font-semibold text-orange-600">🟠 Secondary Detection</p>
+                            <p>Boundary shift detected</p>
                           </div>
                         </Popup>
                       </Marker>
@@ -583,7 +614,7 @@ export function EnhancedGISMonitor() {
       </div>
 
       {/* Change Detection Info */}
-      {showChangeDetection && (
+      {monitoringMode === 'detection' && (
         <Card className="border-orange-300">
           <CardHeader className="border-b border-orange-200 bg-orange-50">
             <CardTitle className="text-sm font-semibold flex items-center gap-2 text-orange-900">
@@ -614,142 +645,7 @@ export function EnhancedGISMonitor() {
         </Card>
       )}
 
-      {/* Satellite Imagery Comparison with Search */}
-      <Card className="border-slate-200">
-        <CardHeader className="border-b border-slate-200 bg-slate-50">
-          <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Eye className="h-5 w-5 text-blue-600" />
-            Before & After Satellite Imagery Comparison
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6 space-y-4">
-          {/* Search Bar for Satellite Comparison */}
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <form onSubmit={handleSearch} className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2.5 h-4 w-4 text-slate-400" />
-                  <Input
-                    type="text"
-                    placeholder="Search industry for satellite comparison..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-                <Button type="submit" size="sm">Compare</Button>
-              </form>
-
-              {/* Quick Search Results for Comparison */}
-              {searchResults.length > 0 && !selectedIndustry && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50 max-h-48 overflow-y-auto">
-                  {searchResults.slice(0, 5).map((industry) => (
-                    <div
-                      key={industry.id}
-                      onClick={() => {
-                        setSelectedIndustry(industry);
-                        const plot = getPlotByIndustryId(industry.id);
-                        setSelectedPlot(plot);
-                      }}
-                      className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-b-0 text-sm"
-                    >
-                      <p className="font-semibold text-slate-900">{industry.companyName}</p>
-                      <p className="text-xs text-slate-500">{industry.registrationNumber}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Before & After Comparison Grid */}
-          {selectedIndustry && selectedPlot ? (
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* Before Image */}
-              <div className="space-y-2">
-                <div>
-                  <p className="font-semibold text-slate-900 mb-2 text-sm">Before Image (6 months ago)</p>
-                  <div className="relative bg-slate-900 rounded-lg overflow-hidden border border-slate-300 h-80">
-                    <img 
-                      src={`https://via.placeholder.com/600x400?text=Before+${selectedPlot.plotNumber}`}
-                      alt="Before"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur px-3 py-1.5 rounded text-xs font-semibold text-white">
-                      📅 August 2025
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                  <p className="text-xs text-blue-600"><strong>Status:</strong> Vegetation dense, no construction</p>
-                </div>
-              </div>
-
-              {/* After Image */}
-              <div className="space-y-2">
-                <div>
-                  <p className="font-semibold text-slate-900 mb-2 text-sm">After Image (Today)</p>
-                  <div className="relative bg-slate-900 rounded-lg overflow-hidden border border-slate-300 h-80">
-                    <img 
-                      src={`https://via.placeholder.com/600x400?text=After+${selectedPlot.plotNumber}`}
-                      alt="After"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur px-3 py-1.5 rounded text-xs font-semibold text-white">
-                      📅 February 2026
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-orange-50 border border-orange-200 rounded p-3">
-                  <p className="text-xs text-orange-600"><strong>Changes:</strong> Construction detected, 0.5 ha expansion</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-200">
-              <Eye className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-600">Search and select an industry to view satellite imagery comparison</p>
-            </div>
-          )}
-
-          {/* Analysis Summary */}
-          {selectedIndustry && selectedPlot && (
-            <div className="grid md:grid-cols-3 gap-3 pt-4 border-t border-slate-200">
-              <div className="bg-green-50 p-3 rounded">
-                <p className="text-xs text-slate-600 font-semibold">NDVI Change</p>
-                <p className="text-lg font-bold text-green-600">-12%</p>
-                <p className="text-xs text-slate-600 mt-1">Vegetation decrease</p>
-              </div>
-              <div className="bg-red-50 p-3 rounded">
-                <p className="text-xs text-slate-600 font-semibold">Area Change</p>
-                <p className="text-lg font-bold text-red-600">+0.5 ha</p>
-                <p className="text-xs text-slate-600 mt-1">Unauthorized expansion</p>
-              </div>
-              <div className="bg-blue-50 p-3 rounded">
-                <p className="text-xs text-slate-600 font-semibold">Confidence</p>
-                <p className="text-lg font-bold text-blue-600">94%</p>
-                <p className="text-xs text-slate-600 mt-1">Detection accuracy</p>
-              </div>
-            </div>
-          )}
-
-          {/* Clear Selection Button */}
-          {selectedIndustry && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                setSelectedIndustry(null);
-                setSelectedPlot(null);
-                setSearchTerm('');
-              }}
-            >
-              Clear Selection
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      {/* Satellite imagery comparison removed per request */}
     </div>
   );
 }

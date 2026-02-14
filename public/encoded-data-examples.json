@@ -1,0 +1,102 @@
+{
+  "name": "Example Encoded Land Data Collections",
+  "note": "These are various encoded formats of the same land plot data. Use any of these with the Data Decoder.",
+  
+  "example_1": {
+    "name": "Base64 Encoded - Complete Region Data",
+    "format": "Base64",
+    "data": "eyJwbG90cyI6IFt7ImlkIjogMSwgIm5hbWUiOiAiUGxvdCBBLDEiLCAicmVnaW9uIjogIkFiaGFucHVyIiwgImNvb3JkaW5hdGVzIjogW1syMS4wNjY1LCA4MS43MzkwXSwgWzIxLjA2NjgsIDgxLjczOTBdLCBbMjEuMDY2OCwgODEuNzM5M10sIFsyMS4wNjY1LCA4MS43MzkzXV0sICJhcmVhIjogMjUwMCwgIm93bmVyIjogIkJoaWxhaSBTdGVlbCIsICJzdGF0dXMiOiAiYWN0aXZlIiwgImNvbXBsaWFuY2UiOiAidmlvbGF0aW9uIn0sIHsiaWQiOiAyLCAibmFtZSI6ICJQZC9vdCBBLTIiLCAicmVnaW9uIjogIkFiaGFucHVyIiwgImNvb3JkaW5hdGVzIjogW1syMS4wNjYyLCA4MS43MzkwXSwgWzIxLjA2NjUsIDgxLjczOTBdLCBbMjEuMDY2NSwgODEuNzM5M10sIFsyMS4wNjYyLCA4MS43MzkzXV0sICJhcmVhIjogMjIwMCwgIm93bmVyIjogIk1haGFkZXYgVGV4dGlsZSIsICJzdGF0dXMiOiAiYWN0aXZlIiwgImNvbXBsaWFuY2UiOiAiY29tcGxpYW50In0sIHsiaWQiOiAzLCAibmFtZSI6ICJQZD9vdCBBLTMiLCAicmVnaW9uIjogIlJhd2FiaGF0YSIsICJjb29yZGluYXRlcyI6IFtbMjEuMzE1MywgODEuNjQ0NV0sIFsyMS4zMTU2LCA4MS42NDQ1XSwgWzIxLjMxNTYsIDgxLjY0NDhdLCBbMjEuMzE1MywgODEuNjQ0OF1dLCAiYXJlYSI6IDE4MDAsICJvd25lciI6ICJJbmR1c3RyaWFsIFBsb3QgQyIsICJzdGF0dXMiOiAiYWN0aXZlIiwgImNvbXBsaWFuY2UiOiAiY29tcGxpYW50In1dfQ==",
+    "instruction": "Copy this entire base64 string and paste it into the Data Decoder"
+  },
+
+  "example_2": {
+    "name": "Hex Encoded - Abhanpur Region",
+    "format": "Hex",
+    "data": "7b22706c6f7473223a205b7b226964223a203130312c226e616d65223a20225265472d30313032222c22726567696f6e223a2241626861647075722c22636f6f7264696e61746573223a205b5b32312e303636352c2038312e37333930405d2c205b32312e303637302c2038312e37333930405d2c205b32312e303637302c2038312e37333935405d2c205b32312e303636352c2038312e37333935415d5d2c2261726565223a203330303030"
+  },
+
+  "example_3": {
+    "name": "JSON - Multiple Regions",
+    "format": "JSON (Plain)",
+    "data": {
+      "regions": {
+        "Abhanpur": [
+          {
+            "id": "AB-001",
+            "name": "Abhanpur Plot 1",
+            "coordinates": [[21.0665, 81.7390], [21.0668, 81.7390], [21.0668, 81.7393], [21.0665, 81.7393]],
+            "area": 2500,
+            "owner": "Bhilai Steel Manufacturing Ltd.",
+            "status": "active",
+            "compliance": "violation"
+          },
+          {
+            "id": "AB-002",
+            "name": "Abhanpur Plot 2",
+            "coordinates": [[21.0662, 81.7390], [21.0665, 81.7390], [21.0665, 81.7393], [21.0662, 81.7393]],
+            "area": 2200,
+            "owner": "Mahadev Textile Mills",
+            "status": "active",
+            "compliance": "compliant"
+          },
+          {
+            "id": "AB-003",
+            "name": "Abhanpur Plot 3",
+            "coordinates": [[21.0659, 81.7390], [21.0662, 81.7390], [21.0662, 81.7393], [21.0659, 81.7393]],
+            "area": 2800,
+            "owner": "Sarda Energy and Minerals Ltd",
+            "status": "active",
+            "compliance": "under-review"
+          }
+        ],
+        "Rawabhata": [
+          {
+            "id": "RA-001",
+            "name": "Rawabhata Plot 1",
+            "coordinates": [[21.3153, 81.6445], [21.3156, 81.6445], [21.3156, 81.6448], [21.3153, 81.6448]],
+            "area": 1800,
+            "owner": "Industrial Plot A",
+            "status": "active",
+            "compliance": "compliant"
+          },
+          {
+            "id": "RA-002",
+            "name": "Rawabhata Plot 2",
+            "coordinates": [[21.3153, 81.6448], [21.3156, 81.6448], [21.3156, 81.6451], [21.3153, 81.6451]],
+            "area": 1800,
+            "owner": "Industrial Plot B",
+            "status": "active",
+            "compliance": "compliant"
+          },
+          {
+            "id": "RA-003",
+            "name": "Rawabhata Plot 3",
+            "coordinates": [[21.3150, 81.6445], [21.3153, 81.6445], [21.3153, 81.6448], [21.3150, 81.6448]],
+            "area": 1800,
+            "owner": "Industrial Plot C",
+            "status": "active",
+            "compliance": "violation"
+          }
+        ]
+      }
+    }
+  },
+
+  "data_format_notes": {
+    "required_fields": [
+      "id (plot identifier)",
+      "name (plot name)",
+      "coordinates (array of [lat, lng] pairs)",
+      "region or location"
+    ],
+    "optional_fields": [
+      "area (in square meters)",
+      "owner (plot owner name)",
+      "status (active/vacant/etc)",
+      "compliance (compliant/violation/under-review)",
+      "registrationDate",
+      "description"
+    ],
+    "coordinates_format": "Array of [latitude, longitude] pairs in decimal degrees. Must form a closed polygon (first and last coordinates can be the same)."
+  }
+}

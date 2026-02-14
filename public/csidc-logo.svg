@@ -1,0 +1,60 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer gear circle -->
+  <circle cx="100" cy="100" r="95" fill="none" stroke="#3d4cb8" stroke-width="3"/>
+  
+  <!-- Gear teeth -->
+  <g fill="#3d4cb8">
+    <!-- Top teeth -->
+    <polygon points="100,15 110,35 90,35"/>
+    <polygon points="130,25 145,40 125,45"/>
+    <polygon points="155,50 165,70 145,65"/>
+    <polygon points="170,85 180,105 160,100"/>
+    
+    <!-- Bottom teeth -->
+    <polygon points="100,185 90,165 110,165"/>
+    <polygon points="70,175 55,160 75,155"/>
+    <polygon points="45,150 35,130 55,135"/>
+    <polygon points="30,115 20,95 40,100"/>
+    
+    <!-- Left teeth -->
+    <polygon points="15,100 35,90 35,110"/>
+    <polygon points="25,70 40,55 45,75"/>
+    <polygon points="50,45 70,35 65,55"/>
+    <polygon points="85,30 105,20 100,40"/>
+    
+    <!-- Right teeth -->
+    <polygon points="185,100 165,110 165,90"/>
+    <polygon points="175,130 160,145 155,125"/>
+    <polygon points="150,155 130,165 135,145"/>
+    <polygon points="115,170 95,180 100,160"/>
+  </g>
+  
+  <!-- Inner circle background -->
+  <circle cx="100" cy="100" r="80" fill="white" stroke="#3d4cb8" stroke-width="2"/>
+  
+  <!-- Industrial buildings/factory -->
+  <g fill="none" stroke="#3d4cb8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Chimney -->
+    <rect x="75" y="55" width="8" height="25"/>
+    
+    <!-- Main building -->
+    <rect x="60" y="75" width="50" height="35" fill="#f0f0f0" stroke="#3d4cb8" stroke-width="2"/>
+    
+    <!-- Roof -->
+    <polygon points="60,75 85,60 110,75" fill="#3d4cb8" opacity="0.3"/>
+    
+    <!-- Doors -->
+    <rect x="68" y="85" width="6" height="10" fill="#3d4cb8"/>
+    <rect x="90" y="85" width="6" height="10" fill="#3d4cb8"/>
+    
+    <!-- Windows -->
+    <rect x="78" y="70" width="4" height="4" fill="#3d4cb8"/>
+    <rect x="100" y="70" width="4" height="4" fill="#3d4cb8"/>
+  </g>
+  
+  <!-- CSIDC Text -->
+  <text x="100" y="130" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#3d4cb8" text-anchor="middle">CSIDC</text>
+  
+  <!-- Decorative line -->
+  <line x1="75" y1="135" x2="125" y2="135" stroke="#3d4cb8" stroke-width="1" opacity="0.5"/>
+</svg>

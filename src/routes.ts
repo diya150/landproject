@@ -6,11 +6,11 @@ import { Plots } from './pages/Plots';
 import { PlotDetail } from './pages/PlotDetail';
 import { Violations } from './pages/Violations';
 import { ChangeDetection } from './pages/ChangeDetection';
+import { Chhattisgarh } from './pages/Chhattisgarh';
 import { Reports } from './pages/Reports';
 import { Alerts } from './pages/Alerts';
 import { IndustriesRegistry } from './pages/IndustriesRegistry';
 import { DashboardLayout } from './components/layout/DashboardLayout';
-import LandMonitoringDashboard from './pages/LandMonitoringDashboard';
 
 export const router = createBrowserRouter([
   {
@@ -30,10 +30,6 @@ export const router = createBrowserRouter([
         Component: Dashboard,
       },
       {
-        path: 'land-monitoring',
-        Component: LandMonitoringDashboard,
-      },
-      {
         path: 'plots',
         Component: Plots,
       },
@@ -48,6 +44,10 @@ export const router = createBrowserRouter([
       {
         path: 'change-detection',
         Component: ChangeDetection,
+      },
+      {
+        path: 'chhattisgarh',
+        Component: Chhattisgarh,
       },
       {
         path: 'reports',

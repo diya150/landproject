@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, Tooltip, useMap } from 'react-leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -25,11 +25,35 @@ interface SatelliteMapProps {
     latitude: number;
     longitude: number;
   };
+  bounds?: [[number, number], [number, number]];
+  markers?: Array<{
+    id: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    description?: string;
+  }>;
+  polygons?: Array<{
+    id: string;
+    name: string;
+    label?: string;
+    coordinates: Array<[number, number]>;
+    meta?: Record<string, string | number>;
+    style?: {
+      color?: string;
+      fillColor?: string;
+      fillOpacity?: number;
+      weight?: number;
+    };
+  }>;
+  onPolygonClick?: (polygonId: string) => void;
   plotId?: string;
   title?: string;
   height?: string;
   industryId?: string;
   industryName?: string;
+  zoom?: number;
+  showDefaultMarker?: boolean;
 }
 
 interface LocationResult {
@@ -64,16 +88,36 @@ function MapUpdater({
   return null;
 }
 
+function MapBounds({
+  bounds,
+}: {
+  bounds: [[number, number], [number, number]];
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.fitBounds(bounds, { padding: [24, 24] });
+  }, [bounds, map]);
+
+  return null;
+}
+
 /**
  * Main Satellite Map with location search integrated
  */
 export function SatelliteMap({
   coordinates = { latitude: 28.5355, longitude: 77.3910 }, // Default to demo area
+  bounds,
+  markers = [],
+  polygons = [],
+  onPolygonClick,
   plotId = 'PLT-2024-001',
   title = 'Search Location on Satellite Map',
   height = '600px',
   industryId,
-  industryName
+  industryName,
+  zoom = 14,
+  showDefaultMarker = true
 }: SatelliteMapProps) {
   const defaultCoordinates = { latitude: 28.5355, longitude: 77.3910 };
   const activeCoordinates = coordinates || defaultCoordinates;
@@ -83,10 +127,29 @@ export function SatelliteMap({
     activeCoordinates.latitude,
     activeCoordinates.longitude,
   ]);
-  const [mapZoom, setMapZoom] = useState(14);
+  const [mapZoom, setMapZoom] = useState(zoom);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [foundLocation, setFoundLocation] = useState<LocationResult | null>(null);
+  const mapContainerProps = {
+    style: { height: '100%', width: '100%', minHeight: '400px' },
+    className: 'rounded-lg flex-1',
+    center: mapCenter,
+    zoom: mapZoom
+  } as any;
+  const tileLayerProps = {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: "&copy; <a href='https://www.esri.com/'>Esri</a>"
+  } as any;
+
+  useEffect(() => {
+    if (bounds) {
+      return;
+    }
+
+    setMapCenter([activeCoordinates.latitude, activeCoordinates.longitude]);
+    setMapZoom(zoom);
+  }, [activeCoordinates.latitude, activeCoordinates.longitude, bounds, zoom]);
 
   /**
    * Search for location using Nominatim (OpenStreetMap)
@@ -151,7 +214,7 @@ export function SatelliteMap({
       <CardHeader className="border-b border-slate-200 bg-slate-50">
         <CardTitle className="text-lg font-semibold">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="p-4 flex flex-col gap-3 flex-1 overflow-hidden">
+      <CardContent className="p-4 flex flex-col gap-3 flex-1 overflow-hidden" style={{ height }}>
         {/* Search Bar */}
         <form onSubmit={handleSearch} className="flex gap-2">
           <Input
@@ -205,20 +268,74 @@ export function SatelliteMap({
         )}
 
         {/* Map */}
-        <MapContainer
-          style={{ height: '100%', width: '100%', minHeight: '400px' }}
-          className="rounded-lg flex-1"
-          center={mapCenter}
-          zoom={mapZoom}
-        >
+        <MapContainer {...mapContainerProps}>
           {/* Satellite Tile Layer */}
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            attribution="&copy; <a href='https://www.esri.com/'>Esri</a>"
-          />
+          <TileLayer {...tileLayerProps} />
 
           {/* Map updater for smooth animations */}
-          <MapUpdater center={mapCenter} zoom={mapZoom} />
+          {bounds ? <MapBounds bounds={bounds} /> : <MapUpdater center={mapCenter} zoom={mapZoom} />}
+
+          {/* Static region markers */}
+          {markers.map((marker) => (
+            <Marker key={marker.id} position={[marker.latitude, marker.longitude]}>
+              <Popup>
+                <div className="text-sm">
+                  <p className="font-semibold">{marker.name}</p>
+                  {marker.description && (
+                    <p className="text-xs text-slate-600 mt-1">{marker.description}</p>
+                  )}
+                  <div className="text-xs font-mono mt-2 space-y-1">
+                    <p>Lat: {marker.latitude.toFixed(6)}</p>
+                    <p>Lon: {marker.longitude.toFixed(6)}</p>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {/* Plot overlays */}
+          {polygons.map((polygon) => (
+            <Polygon
+              key={polygon.id}
+              positions={polygon.coordinates}
+              pathOptions={{
+                color: polygon.style?.color ?? '#ef4444',
+                weight: polygon.style?.weight ?? 1.5,
+                fillColor: polygon.style?.fillColor ?? '#f87171',
+                fillOpacity: polygon.style?.fillOpacity ?? 0.25,
+              }}
+              eventHandlers={{
+                click: () => onPolygonClick?.(polygon.id),
+              }}
+            >
+              {polygon.label && (
+                <Tooltip
+                  {...({
+                    permanent: true,
+                    direction: 'center',
+                    className: 'bg-white/80 text-slate-900 text-[10px] font-semibold'
+                  } as any)}
+                >
+                  {polygon.label}
+                </Tooltip>
+              )}
+              <Popup>
+                <div className="text-sm">
+                  <p className="font-semibold">{polygon.name}</p>
+                  {polygon.meta && (
+                    <div className="text-xs text-slate-600 mt-1 space-y-1">
+                      {Object.entries(polygon.meta).map(([key, value]) => (
+                        <div key={key} className="flex justify-between gap-3">
+                          <span className="capitalize">{key}:</span>
+                          <span className="font-medium text-slate-900">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            </Polygon>
+          ))}
 
           {/* Marker for found location */}
           {foundLocation && (
@@ -237,36 +354,38 @@ export function SatelliteMap({
           )}
 
           {/* Default marker */}
-          <Marker position={mapCenter}>
-            <Popup>
-              {(() => {
-                const imagePath = industryId ? getIndustryImagePath(industryId) : null;
-                return (
-                  <div className="text-sm max-w-xs">
-                    {imagePath && (
-                      <div className="mb-2 w-32 h-24 rounded overflow-hidden border border-slate-300">
-                        <img
-                          src={imagePath}
-                          alt={industryName}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    <p className="font-semibold">{industryName || plotId}</p>
-                    <p className="text-xs">
-                      Lat: {mapCenter[0].toFixed(6)}
-                    </p>
-                    <p className="text-xs">
-                      Lon: {mapCenter[1].toFixed(6)}
-                    </p>
-                  </div>
-                );
-              })()}
-            </Popup>
-          </Marker>
+          {showDefaultMarker && (
+            <Marker position={mapCenter}>
+              <Popup>
+                {(() => {
+                  const imagePath = industryId ? getIndustryImagePath(industryId) : null;
+                  return (
+                    <div className="text-sm max-w-xs">
+                      {imagePath && (
+                        <div className="mb-2 w-32 h-24 rounded overflow-hidden border border-slate-300">
+                          <img
+                            src={imagePath}
+                            alt={industryName}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                      <p className="font-semibold">{industryName || plotId}</p>
+                      <p className="text-xs">
+                        Lat: {mapCenter[0].toFixed(6)}
+                      </p>
+                      <p className="text-xs">
+                        Lon: {mapCenter[1].toFixed(6)}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </Popup>
+            </Marker>
+          )}
         </MapContainer>
       </CardContent>
     </Card>

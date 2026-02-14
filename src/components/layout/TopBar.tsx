@@ -19,12 +19,6 @@ export function TopBar() {
 
       {/* Right Section */}
       <div className="flex items-center gap-4">
-        {/* System Status */}
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
-          <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="text-sm font-medium text-green-800">System Active</span>
-        </div>
-
         {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5 text-slate-600" />

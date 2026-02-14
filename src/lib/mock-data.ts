@@ -3,7 +3,7 @@ import type { PlotData, Violation, Alert } from './types';
 export const mockPlots: PlotData[] = [
   {
     id: 'PLT-2024-001',
-    allotteeName: 'Apex Manufacturing Ltd.',
+    allotteeName: 'Bhilai Steel Manufacturing Ltd.',
     allottedArea: 5000,
     currentArea: 5420,
     status: 'violation',
@@ -15,19 +15,19 @@ export const mockPlots: PlotData[] = [
   },
   {
     id: 'PLT-2024-002',
-    allotteeName: 'GreenTech Industries',
+    allotteeName: 'Mahadev Textile Mills',
     allottedArea: 3500,
     currentArea: 3480,
     status: 'compliant',
     complianceScore: 95,
     location: { lat: 28.6100, lng: 77.2150 },
-    industryType: 'Technology',
+    industryType: 'Textile',
     allottedDate: '2019-08-20',
     lastInspection: '2026-02-01',
   },
   {
     id: 'PLT-2024-003',
-    allotteeName: 'Industrial Metals Corp',
+    allotteeName: 'Sarda Energy and Minerals Ltd',
     allottedArea: 7200,
     currentArea: 7150,
     status: 'under-review',
@@ -51,7 +51,7 @@ export const mockPlots: PlotData[] = [
   },
   {
     id: 'PLT-2024-005',
-    allotteeName: 'PharmaTech Solutions',
+    allotteeName: 'Chhattisgarh Pharma Industries',
     allottedArea: 4500,
     currentArea: 5100,
     status: 'violation',
@@ -61,9 +61,32 @@ export const mockPlots: PlotData[] = [
     allottedDate: '2020-11-05',
     lastInspection: '2026-02-05',
   },
+  {
+    id: 'PLT-2024-150',
+    allotteeName: 'Sumit Enterprises',
+    allottedArea: 8500,
+    currentArea: 9792,
+    status: 'violation',
+    complianceScore: 58,
+    location: { lat: 28.6250, lng: 77.2220 },
+    industryType: 'Technology',
+    allottedDate: '2024-01-10',
+    lastInspection: '2026-02-12',
+  },
 ];
 
 export const mockViolations: Violation[] = [
+  {
+    id: 'sumit',
+    plotId: 'PLT-2024-150',
+    type: 'unauthorized-construction',
+    severity: 'critical',
+    dateDetected: '2026-02-14',
+    status: 'pending',
+    description: 'Unauthorized server room construction detected exceeding approved building plan',
+    deviationPercent: 15.2,
+    industry: 'Sumit Enterprises',
+  },
   {
     id: 'VIO-2024-045',
     plotId: 'PLT-2024-001',
@@ -73,7 +96,7 @@ export const mockViolations: Violation[] = [
     status: 'under-investigation',
     description: 'Plot boundary exceeded by 8.4% on eastern perimeter',
     deviationPercent: 8.4,
-    industry: 'Apex Manufacturing Ltd.',
+    industry: 'Bhilai Steel Manufacturing Ltd.',
   },
   {
     id: 'VIO-2024-047',
@@ -84,7 +107,7 @@ export const mockViolations: Violation[] = [
     status: 'pending',
     description: 'Unauthorized warehouse construction detected via satellite imaging',
     deviationPercent: 13.3,
-    industry: 'PharmaTech Solutions',
+    industry: 'Chhattisgarh Pharma Industries',
   },
   {
     id: 'VIO-2024-039',
@@ -94,7 +117,7 @@ export const mockViolations: Violation[] = [
     dateDetected: '2026-01-28',
     status: 'under-investigation',
     description: 'Potential land-use modification detected - requires field inspection',
-    industry: 'Industrial Metals Corp',
+    industry: 'Sarda Energy and Minerals Ltd',
   },
   {
     id: 'VIO-2024-031',
@@ -104,7 +127,7 @@ export const mockViolations: Violation[] = [
     dateDetected: '2026-01-22',
     status: 'escalated',
     description: 'Environmental compliance breach - unauthorized waste disposal area',
-    industry: 'Chemical Industries Ltd.',
+    industry: 'ChemTech Industries Pvt. Ltd.',
   },
   {
     id: 'VIO-2024-028',
@@ -115,11 +138,21 @@ export const mockViolations: Violation[] = [
     status: 'resolved',
     description: 'Minor boundary deviation corrected after inspection',
     deviationPercent: 2.1,
-    industry: 'TechPark Developers',
+    industry: 'Mahadev Textile Mills',
   },
 ];
 
 export const mockAlerts: Alert[] = [
+  {
+    id: 'ALT-SUMIT',
+    type: 'violation',
+    severity: 'critical',
+    title: 'Critical Violation - Sumit Enterprises',
+    description: 'PLT-2024-150: Unauthorized server room construction exceeding 15.2% of approved plan',
+    timestamp: '2026-02-14T10:15:00',
+    plotId: 'PLT-2024-150',
+    isRead: false,
+  },
   {
     id: 'ALT-001',
     type: 'violation',

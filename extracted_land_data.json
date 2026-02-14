@@ -1,0 +1,29 @@
+{
+  "coordinate_count": 42349,
+  "sample_coordinates": [
+    "[575143.50856019,2353658.45168666,0]",
+    "[575129.02426995,2353632.63015921,0]",
+    "[575019.00738397,2353644.86177378,0]",
+    "[574997.23069994,2353645.98860145,0]",
+    "[574964.38550723,2353648.70087321,0]",
+    "[574889.06842078,2353656.40804815,0]",
+    "[574853.9158249,2353661.64283531,0]",
+    "[574824.42004807,2353666.22635042,0]",
+    "[574765.31631718,2353671.60835165,0]",
+    "[574745.67049421,2353676.33401552,0]"
+  ],
+  "property_count": 50,
+  "sample_properties": [
+    "\"properties\":{\"industrial\":\"AMASEON I\"}",
+    "\"properties\":{\"industrial\":\"BHANPURI\"}",
+    "\"properties\":{\"industr\nial\":\"BIRKONI\"}",
+    "\"properties\":{\"industri\nal\":\"BORAI\"}",
+    "\"properties\":{\"industrial\":\"ELECTRONIC \nEMC\"}",
+    "\"properties\":{\"industrial\":\"GOGOAN\"}",
+    "\"properties\":{\"industrial\":\"GONDWARA\"}",
+    "\"properties\":{\"industrial\":\"HARINCHHAPA\nRA\"}",
+    "\"properties\":{\"industrial\":\"NAYANP\nUR-\nGIBARG ANJ\"}",
+    "\"properties\":{\"industrial\":\"RANIDURGAWATI \nANJANI\"}"
+  ],
+  "raw_text_length": 2132894
+}
