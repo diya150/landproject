@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, Search, Download, Image as ImageIcon, MapPin, X } from 'lucide-react';
+import { Zap, Search, Download, Image as ImageIcon, MapPin, X, Link as LinkIcon, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { SatelliteMap } from '../components/dashboard/SatelliteMap';
 import { industriesData } from '../lib/industries-data';
+import { blockchainService } from '../services/blockchainService';
 import GoogleMapReact from 'google-map-react';
 
 
@@ -154,24 +155,71 @@ export function ChangeDetection() {
     setShowSuggestions(false);
   };
 
-  const handleRaiseComplaint = () => {
+  const [isSubmittingBlockchain, setIsSubmittingBlockchain] = useState(false);
+  const [blockchainStatus, setBlockchainStatus] = useState<any>(null);
+
+  const handleRaiseComplaint = async () => {
     if (!selectedCompanyForComplaint || !complaintReason.trim()) {
       alert('Please select a company and enter a reason');
       return;
     }
 
-    const newComplaint = {
-      id: Date.now().toString(),
-      companyName: selectedCompanyForComplaint,
-      reason: complaintReason,
-      date: new Date().toLocaleDateString(),
-      status: 'Open'
-    };
+    setIsSubmittingBlockchain(true);
+    try {
+      // Get company email (use a default or extract from data)
+      const company = industriesData.find(
+        (ind) => ind.companyName === selectedCompanyForComplaint
+      );
+      const companyEmail = company?.email || 'noreply@company.local';
+      const companyPhone = company?.phone || 'N/A';
+      const location = company?.location || 'Not specified';
 
-    setComplaints([...complaints, newComplaint]);
-    setSelectedCompanyForComplaint('');
-    setComplaintReason('');
-    alert('Complaint raised successfully and added to violation list!');
+      // Record complaint on blockchain with email notification
+      const blockchainResult = await blockchainService.recordComplaint({
+        companyName: selectedCompanyForComplaint,
+        reason: complaintReason,
+        email: companyEmail,
+        phone: companyPhone,
+        severity: 'High',
+        location: location,
+        details: complaintReason
+      });
+
+      // Store complaint locally
+      const newComplaint = {
+        id: blockchainResult.blockchain.hash,
+        companyName: selectedCompanyForComplaint,
+        reason: complaintReason,
+        date: new Date().toLocaleDateString(),
+        status: 'Recorded on Blockchain',
+        blockchainHash: blockchainResult.blockchain.hash,
+        blockNumber: blockchainResult.blockchain.blockNumber
+      };
+
+      setComplaints([...complaints, newComplaint]);
+      setBlockchainStatus({
+        status: 'success',
+        hash: blockchainResult.blockchain.hash,
+        blockNumber: blockchainResult.blockchain.blockNumber,
+        companyName: selectedCompanyForComplaint
+      });
+
+      setSelectedCompanyForComplaint('');
+      setComplaintReason('');
+
+      alert(
+        `✓ Complaint recorded on blockchain!\n\nBlock: ${blockchainResult.blockchain.blockNumber}\nHash: ${blockchainResult.blockchain.hash}\n\nNotifications sent to company and admin.`
+      );
+    } catch (error) {
+      console.error('Error recording complaint:', error);
+      alert(`Error recording complaint: ${(error as Error).message}`);
+      setBlockchainStatus({
+        status: 'error',
+        error: (error as Error).message
+      });
+    } finally {
+      setIsSubmittingBlockchain(false);
+    }
   };
 
   // Marker component for Google Map

@@ -12,6 +12,7 @@ const plotRoutes = require('./routes/plotRoutes');
 const analysisRoutes = require('./routes/analysisRoutes');
 const satelliteRoutes = require('./routes/satelliteRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const blockchainRoutes = require('./routes/blockchainRoutes');
 
 // Initialize Express app
 const app = express();
@@ -42,6 +43,7 @@ app.use('/api/plots', plotRoutes);
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/satellite', satelliteRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/blockchain', blockchainRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
