@@ -1,1118 +1,754 @@
-import { useState, useEffect } from 'react';
-import { AlertTriangle, Maximize2, Download, Calendar, Loader2, MapPin, Eye, Search, X, MapPinCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Zap, Search, Download, Image as ImageIcon, MapPin, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { SeverityBadge } from '../components/dashboard/SeverityBadge';
 import { SatelliteMap } from '../components/dashboard/SatelliteMap';
-import { EnhancedGISMonitor } from '../components/dashboard/EnhancedGISMonitor';
-import { Slider } from '../components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Badge } from '../components/ui/badge';
-import { industriesData, Industry } from '../lib/industries-data';
-import { plotsData, getPlotByIndustryId } from '../lib/plots-data';
-import { getIndustryImagePath } from '../lib/industry-images';
+import { industriesData } from '../lib/industries-data';
+import GoogleMapReact from 'google-map-react';
 
-const API_BASE_URL = 'http://localhost:5000/api';
 
-interface ChangeDetectionData {
-  changeDetected: boolean;
-  changeType?: string;
-  confidence?: number;
-  severity?: string;
-  anomalyScore?: number;
-  timeframe?: { daysDifference: number };
-  description?: string;
-  metrics?: {
-    ndviChange: number;
-    ndbiChange: number;
-    mndwiChange: number;
-    eviChange: number;
-  };
-  recommendations?: string[];
-}
+
+// Region definitions with precise boundaries for real map
+const INDUSTRIAL_REGIONS = {
+  abhanpur: {
+    name: 'Abhanpur Industrial Area – Naya Raipur',
+    bounds: {
+      north: 21.0689,
+      south: 21.0640,
+      east: 81.7420,
+      west: 81.7383,
+      minLat: 21.0640,
+      maxLat: 21.0689
+    },
+    center: { lat: 21.0665, lng: 81.7399 },
+    zoom: 15,
+    blocks: 42,
+    totalPlots: 42,
+    area: 2.5,
+    description: 'Clustered layout with irregular boundaries'
+  },
+  rawabhata: {
+    name: 'RAWABHATA Industrial Region',
+    bounds: {
+      north: 21.3175,
+      south: 21.3130,
+      east: 81.6480,
+      west: 81.6420,
+      minLat: 21.3130,
+      maxLat: 21.3175
+    },
+    center: { lat: 21.3153, lng: 81.6451 },
+    zoom: 14,
+    blocks: 65,
+    totalPlots: 65,
+    area: 4.2,
+    description: 'Grid-style layout with geometric boundaries'
+  }
+};
 
 export function ChangeDetection() {
-  const [comparisonValue, setComparisonValue] = useState([50]);
-  const [loading, setLoading] = useState(false);
-  const [selectedPlot, setSelectedPlot] = useState('PLT-2024-001');
-  const [beforeDate, setBeforeDate] = useState('2024-01-15');
-  const [afterDate, setAfterDate] = useState('2026-02-13');
-  const [changeDetectionData, setChangeDetectionData] = useState<ChangeDetectionData | null>(null);
-  const [satelliteImagery, setSatelliteImagery] = useState<{ rgb?: any; ndvi?: any; falseColor?: any } | null>(null);
-  const [spectralData, setSpectralData] = useState(null);
-  const [viewMode, setViewMode] = useState('rgb'); // rgb, ndvi, false-color
+  const [selectedRegion, setSelectedRegion] = useState('abhanpur');
+  const [mapFocus, setMapFocus] = useState<'all' | 'selected'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeTab, setActiveTab] = useState<'survey' | 'compare'>('survey');
+  const [selectedPlot, setSelectedPlot] = useState<number | null>(null);
+  const [selectedPlotDetails, setSelectedPlotDetails] = useState<{
+    id: number;
+    area: number;
+    status: string;
+    center: { lat: number; lng: number };
+  } | null>(null);
   
-  // Land Allotted feature states
-  const [landSearchTerm, setLandSearchTerm] = useState('');
-  const [selectedIndustry, setSelectedIndustry] = useState<Industry | null>(null);
-  const [selectedLandPlot, setSelectedLandPlot] = useState<any>(null);
-  const [showLandDetails, setShowLandDetails] = useState(false);
-  const [searchResults, setSearchResults] = useState<typeof industriesData>([]);
+  // Complaint management
+  const [selectedCompanyForComplaint, setSelectedCompanyForComplaint] = useState('');
+  const [complaintReason, setComplaintReason] = useState('');
+  const [complaints, setComplaints] = useState<Array<{
+    id: string;
+    companyName: string;
+    reason: string;
+    date: string;
+    status: string;
+  }>>([]);
+  
+  // Google Map state
+  const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
+  const [googleMapReady, setGoogleMapReady] = useState(false);
 
-  // Fetch satellite change detection data
-  useEffect(() => {
-    const fetchChangeDetection = async () => {
-      if (!selectedPlot || !beforeDate || !afterDate) return;
-      
-      setLoading(true);
-      try {
-        const response = await fetch(`${API_BASE_URL}/satellite/change-detection/compare`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ plotId: selectedPlot, beforeDate, afterDate })
-        });
+  // Industry coordinates mapping (Raipur area)
+  const industryCoordinates: Record<string, {lat: number; lng: number}> = {
+    'Bhilai Steel Manufacturing Ltd.': { lat: 21.0665, lng: 81.7399 },
+    'Chhattisgarh Pharma Industries': { lat: 21.0650, lng: 81.7410 },
+    'TechCG Electronics Pvt. Ltd.': { lat: 21.0680, lng: 81.7385 },
+    'Mahadev Textile Mills': { lat: 21.0645, lng: 81.7420 },
+    'Agro Foods Processing Ltd.': { lat: 21.0670, lng: 81.7405 },
+    'InfoTech Solutions Hub': { lat: 21.0655, lng: 81.7390 },
+    'ChemTech Industries Pvt. Ltd.': { lat: 21.0675, lng: 81.7415 },
+    'AutoParts Manufacturing Co.': { lat: 21.0660, lng: 81.7380 },
+    'Green Energy Solutions': { lat: 21.0640, lng: 81.7400 },
+    'Precision Tools & Dies Ltd.': { lat: 21.0685, lng: 81.7410 },
+    'Sarda Energy and Minerals Ltd': { lat: 21.0658, lng: 81.7395 },
+    'Sarthak Metals Ltd': { lat: 21.0672, lng: 81.7402 },
+    'Mahamaya Sponge Pvt Ltd': { lat: 21.0648, lng: 81.7388 },
+    'Nakoda TMT': { lat: 21.0668, lng: 81.7420 },
+    'Bansal Metallics': { lat: 21.0662, lng: 81.7398 },
+    'BigMint (Steelmint)': { lat: 21.0670, lng: 81.7408 },
+    'Textile Park': { lat: 21.0644, lng: 81.7415 },
+    'Plastic Park': { lat: 21.0656, lng: 81.7392 },
+    'Rail Park': { lat: 21.0674, lng: 81.7411 },
+    'Balod Bharda Industry': { lat: 21.0652, lng: 81.7385 },
+    'Barabaspur Industry': { lat: 21.0678, lng: 81.7418 },
+    'Parasiya Industry': { lat: 21.0642, lng: 81.7405 },
+    'Rikhi Industry': { lat: 21.0666, lng: 81.7396 },
+    'Tilda Industry': { lat: 21.0684, lng: 81.7412 },
+    'Ulakiya Industry': { lat: 21.0658, lng: 81.7388 },
+    'KESDA (Industrial Estate)': { lat: 21.0670, lng: 81.7420 },
+    'Beekay Engineering Corporation': { lat: 21.0646, lng: 81.7394 },
+  };
 
-        if (response.ok) {
-          const result = await response.json();
-          setChangeDetectionData(result.data?.changeDetection);
-        }
-      } catch (error) {
-        console.error('Error fetching change detection data:', error);
-      } finally {
-        setLoading(false);
+  const getIndustryCoordinates = (companyName: string) => {
+    return industryCoordinates[companyName] || { lat: 21.0665, lng: 81.7399 };
+  };
+
+  const handleRegionChange = (region: string) => {
+    setSelectedRegion(region);
+    setSelectedPlot(null);
+    setSearchQuery('');
+  };
+
+  // Generate smart suggestions
+  const getSuggestions = () => {
+    if (!searchQuery.trim()) return [];
+    
+    const query = searchQuery.toLowerCase();
+    const suggestions = new Set<string>();
+    
+    industriesData.forEach(industry => {
+      // Match company name
+      if (industry.companyName.toLowerCase().includes(query)) {
+        suggestions.add(industry.companyName);
       }
-    };
-
-    const timer = setTimeout(fetchChangeDetection, 500);
-    return () => clearTimeout(timer);
-  }, [selectedPlot, beforeDate, afterDate]);
-
-  // Fetch satellite imagery
-  useEffect(() => {
-    const fetchImagery = async () => {
-      setLoading(true);
-      try {
-        const rgbResponse = await fetch(`${API_BASE_URL}/satellite/spectral/rgb/${selectedPlot}`);
-        const ndviResponse = await fetch(`${API_BASE_URL}/satellite/spectral/ndvi/${selectedPlot}`);
-        const fcResponse = await fetch(`${API_BASE_URL}/satellite/spectral/false-color/${selectedPlot}`);
-
-        if (rgbResponse.ok && ndviResponse.ok && fcResponse.ok) {
-          const rgb = await rgbResponse.json();
-          const ndvi = await ndviResponse.json();
-          const fc = await fcResponse.json();
-          
-          setSatelliteImagery({
-            rgb: rgb.data?.rgb,
-            ndvi: ndvi.data?.ndvi,
-            falseColor: fc.data?.falseColor
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching satellite imagery:', error);
-      } finally {
-        setLoading(false);
+      // Match industry type
+      if (industry.industryType.toLowerCase().includes(query)) {
+        suggestions.add(industry.industryType);
       }
-    };
+      // Match location
+      if (industry.location.toLowerCase().includes(query)) {
+        suggestions.add(industry.location);
+      }
+    });
+    
+    return Array.from(suggestions).slice(0, 8); // Limit to 8 suggestions
+  };
 
-    fetchImagery();
-  }, [selectedPlot, viewMode]);
+  const suggestions = getSuggestions();
 
-  // Handle Land Allotted search
-  useEffect(() => {
-    if (!landSearchTerm.trim()) {
-      setSearchResults([]);
+  // Handle search
+  const handleSearch = (query: string) => {
+    setSearchQuery(query.toLowerCase());
+    setShowSuggestions(query.trim().length > 0);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setSearchQuery(suggestion.toLowerCase());
+    setShowSuggestions(false);
+  };
+
+  const handleRaiseComplaint = () => {
+    if (!selectedCompanyForComplaint || !complaintReason.trim()) {
+      alert('Please select a company and enter a reason');
       return;
     }
 
-    const filteredIndustries = industriesData.filter((industry) => {
-      const searchLower = landSearchTerm.toLowerCase();
-      return (
-        industry.companyName.toLowerCase().includes(searchLower) ||
-        industry.registrationNumber.toLowerCase().includes(searchLower) ||
-        industry.plotNumber.toLowerCase().includes(searchLower)
-      );
-    });
-
-    setSearchResults(filteredIndustries);
-  }, [landSearchTerm]);
-
-  // Handle industry selection for Land Allotted
-  const handleSelectIndustry = (industry: Industry) => {
-    setSelectedIndustry(industry);
-    const plot = getPlotByIndustryId(industry.id);
-    setSelectedLandPlot(plot);
-    // Auto-load satellite imagery for this plot
-    if (plot) {
-      setSelectedPlot(plot.id);
-      // Set dates to recent for better satellite data
-      const today = new Date();
-      const sixMonthsAgo = new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000);
-      setAfterDate(today.toISOString().split('T')[0]);
-      setBeforeDate(sixMonthsAgo.toISOString().split('T')[0]);
-    }
-    setShowLandDetails(false);
-    setLandSearchTerm('');
-    setSearchResults([]);
-  };
-
-  // Helper function to get status color
-  const getStatusColor = (status: any) => {
-    switch (status) {
-      case 'active':
-        return '#dc2626'; // red
-      case 'vacant':
-        return '#d1d5db'; // grey
-      case 'unusable':
-        return '#f59e0b'; // orange
-      case 'disputed':
-        return '#eab308'; // yellow
-      default:
-        return '#3b82f6'; // blue
-    }
-  };
-
-  // Helper function to calculate polygon center
-  const calculatePolygonCenter = (pointsString: string) => {
-    const coords = pointsString.split(' ').map((point) => {
-      const [x, y] = point.split(',').map(Number);
-      return { x, y };
-    });
-
-    const centerX =
-      coords.reduce((sum, coord) => sum + coord.x, 0) / coords.length;
-    const centerY =
-      coords.reduce((sum, coord) => sum + coord.y, 0) / coords.length;
-
-    return { x: centerX, y: centerY };
-  };
-
-  // Helper function to get industry icon emoji
-  const getIndustryIcon = (industryType: string | number) => {
-    const iconMap: Record<string, string> = {
-      'Steel Manufacturing': '🏭',
-      'Pharmaceutical': '💊',
-      'Information Technology': '💻',
-      'Automotive': '🚗',
-      'Textile': '👕',
-      'Food Processing': '🍱',
-      'Chemical': '⚗️',
-      'Power Generation': '⚡',
-      'Machinery': '⚙️',
-      'Logistics': '📦',
+    const newComplaint = {
+      id: Date.now().toString(),
+      companyName: selectedCompanyForComplaint,
+      reason: complaintReason,
+      date: new Date().toLocaleDateString(),
+      status: 'Open'
     };
-    return iconMap[String(industryType)] || '🏢';
+
+    setComplaints([...complaints, newComplaint]);
+    setSelectedCompanyForComplaint('');
+    setComplaintReason('');
+    alert('Complaint raised successfully and added to violation list!');
   };
+
+  // Marker component for Google Map
+  const MarkerComponent = ({ id, companyName, isSelected, lat, lng }: { id: string; companyName: string; isSelected: boolean; lat?: number; lng?: number }) => (
+    <div
+      onClick={() => setSelectedMarker(isSelected ? null : id)}
+      className="cursor-pointer"
+      title={companyName}
+    >
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg ${
+        isSelected ? 'bg-red-600 scale-125' : 'bg-blue-600 hover:scale-110'
+      } transition-all duration-200`}>
+        <MapPin className="w-4 h-4" />
+      </div>
+      {isSelected && (
+        <div className="absolute bg-white p-2 rounded shadow-lg text-xs font-medium whitespace-nowrap z-50 left-6 top-0">
+          {companyName}
+        </div>
+      )}
+    </div>
+  );
+
+  const regionData = INDUSTRIAL_REGIONS[selectedRegion as keyof typeof INDUSTRIAL_REGIONS];
+  const regionMarkers = Object.entries(INDUSTRIAL_REGIONS).map(([key, data]) => ({
+    id: key,
+    name: data.name,
+    latitude: data.center.lat,
+    longitude: data.center.lng,
+    description: `${data.totalPlots} plots • ${data.area.toFixed(1)} km²`
+  }));
+  const combinedBounds: [[number, number], [number, number]] = [
+    [
+      Math.min(...Object.values(INDUSTRIAL_REGIONS).map((region) => region.bounds.south)),
+      Math.min(...Object.values(INDUSTRIAL_REGIONS).map((region) => region.bounds.west))
+    ],
+    [
+      Math.max(...Object.values(INDUSTRIAL_REGIONS).map((region) => region.bounds.north)),
+      Math.max(...Object.values(INDUSTRIAL_REGIONS).map((region) => region.bounds.east))
+    ]
+  ];
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header with Controls */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Advanced GIS & Satellite Monitoring</h1>
-          <p className="text-slate-600">Leaflet-powered GIS with Sentinel-2 satellite imagery, change detection & compliance monitoring</p>
+    <div className="min-h-screen bg-gray-50 px-6 py-8">
+      <div className="mx-auto max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Survey Comparison System</h1>
+          <p className="mt-2 text-gray-600">Layered geometric comparison: Old Plan | Drone Survey | Live Satellite</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
+
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('survey')}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
+              activeTab === 'survey'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            📍 Survey Comparison
+          </button>
+          <button
+            onClick={() => setActiveTab('compare')}
+            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
+              activeTab === 'compare'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            🖼️ Visual Compare
+          </button>
         </div>
-      </div>
 
-      {/* Enhanced GIS Monitor - Main Monitoring System */}
-      <EnhancedGISMonitor />
-
-      {/* Original Change Detection Controls (Collapsible) */}
-      <Card className="border-slate-200 bg-slate-50">
-        <CardHeader className="border-b border-slate-200 bg-slate-100">
-          <CardTitle className="text-lg font-semibold">Advanced Spectral Analysis</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Select Plot</label>
-              <Select value={selectedPlot} onValueChange={setSelectedPlot}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PLT-2024-001">PLT-2024-001</SelectItem>
-                  <SelectItem value="PLT-2024-005">PLT-2024-005</SelectItem>
-                  <SelectItem value="PLT-2024-003">PLT-2024-003</SelectItem>
-                  <SelectItem value="PLT-2024-012">PLT-2024-012</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Before Date</label>
-              <input
-                type="date"
-                value={beforeDate}
-                onChange={(e) => setBeforeDate(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">After Date</label>
-              <input
-                type="date"
-                value={afterDate}
-                onChange={(e) => setAfterDate(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">View Mode</label>
-              <Select value={viewMode} onValueChange={setViewMode}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rgb">RGB True Color</SelectItem>
-                  <SelectItem value="ndvi">NDVI Vegetation</SelectItem>
-                  <SelectItem value="false-color">False Color (NIR)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Change Detection Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-slate-200">
-          <CardContent className="p-4">
-            <p className="text-sm font-medium text-slate-600 mb-1">Detection Status</p>
-            <p className="text-2xl font-bold text-slate-900">
-              {changeDetectionData?.changeDetected ? '⚠️ Active' : '✓ Stable'}
-            </p>
-            <p className="text-xs text-slate-600 mt-1">
-              {changeDetectionData?.timeframe?.daysDifference || 0} days analyzed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={changeDetectionData?.changeDetected ? 'border-red-200 bg-red-50' : 'border-slate-200'}>
-          <CardContent className="p-4">
-            <p className="text-sm font-medium text-slate-600 mb-1">Change Type</p>
-            <p className="text-lg font-bold text-slate-900">
-              {changeDetectionData?.changeType || 'Analyzing...'}
-            </p>
-            <p className="text-xs text-slate-600 mt-1">
-              Confidence: {changeDetectionData?.confidence ? `${(changeDetectionData.confidence * 100).toFixed(0)}%` : 'N/A'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200">
-          <CardContent className="p-4">
-            <p className="text-sm font-medium text-slate-600 mb-1">Severity Level</p>
-            <div className="flex items-center gap-2">
-              <SeverityBadge 
-                severity={
-                  changeDetectionData?.severity === 'CRITICAL' ? 'critical' :
-                  changeDetectionData?.severity === 'HIGH' ? 'high' : 'low'
-                } 
-                size="md"
-              />
-              <span className="font-bold">{changeDetectionData?.severity || 'LOW'}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200">
-          <CardContent className="p-4">
-            <p className="text-sm font-medium text-slate-600 mb-1">Anomaly Score</p>
-            <p className="text-2xl font-bold text-slate-900">
-              {changeDetectionData?.anomalyScore ? `${(changeDetectionData.anomalyScore * 100).toFixed(0)}%` : 'N/A'}
-            </p>
-            <p className="text-xs text-slate-600 mt-1">
-              {(changeDetectionData?.anomalyScore ?? 0) > 0.7 ? 'High anomaly' : 'Normal'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Before/After Comparison */}
-      <Card className="border-slate-200">
-        <CardHeader className="border-b border-slate-200 bg-slate-50">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold">Satellite Imagery Comparison</CardTitle>
-            <div className="flex gap-2 text-xs text-slate-600">
-              <span className="flex items-center gap-1"><Eye className="h-3 w-3" /> {viewMode.toUpperCase()}</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="relative aspect-video bg-slate-900 overflow-hidden">
-            {loading ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
-                <Loader2 className="h-8 w-8 text-white animate-spin" />
-              </div>
-            ) : (
-              <>
-                {/* Before Image */}
-                <div 
-                  className="absolute inset-0 overflow-hidden"
-                  style={{ clipPath: `inset(0 ${100 - comparisonValue[0]}% 0 0)` }}
-                >
-                  <img 
-                    src={satelliteImagery?.rgb?.url || 'https://via.placeholder.com/800x600?text=Before+Image'}
-                    alt="Before"
-                    className="w-full h-full object-cover brightness-75"
-                  />
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg">
-                    <p className="text-xs font-semibold text-slate-900">BEFORE: {beforeDate}</p>
-                  </div>
-                </div>
-
-                {/* After Image */}
-                <div 
-                  className="absolute inset-0 overflow-hidden"
-                  style={{ clipPath: `inset(0 0 0 ${comparisonValue[0]}%)` }}
-                >
-                  <img 
-                    src={
-                      viewMode === 'ndvi' ? satelliteImagery?.ndvi?.url :
-                      viewMode === 'false-color' ? satelliteImagery?.falseColor?.url :
-                      satelliteImagery?.rgb?.url || 'https://via.placeholder.com/800x600?text=After+Image'
-                    }
-                    alt="After"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg">
-                    <p className="text-xs font-semibold text-slate-900">AFTER: {afterDate}</p>
-                  </div>
-                </div>
-
-                {/* Anomaly Markers */}
-                {changeDetectionData?.changeDetected && (
-                  <>
-                    <div className="absolute top-1/3 right-1/4 h-6 w-6 bg-red-500 rounded-full border-2 border-white shadow-lg animate-pulse flex items-center justify-center">
-                      <AlertTriangle className="h-4 w-4 text-white" />
-                    </div>
-                    <div className="absolute bottom-1/3 left-1/3 h-6 w-6 bg-red-500 rounded-full border-2 border-white shadow-lg animate-pulse flex items-center justify-center">
-                      <AlertTriangle className="h-4 w-4 text-white" />
-                    </div>
-                  </>
-                )}
-
-                {/* Slider Line */}
-                <div 
-                  className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize"
-                  style={{ left: `${comparisonValue[0]}%` }}
-                >
-                  <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 h-12 w-12 bg-white rounded-full shadow-lg flex items-center justify-center">
-                    <div className="flex gap-1">
-                      <div className="w-0.5 h-6 bg-slate-400"></div>
-                      <div className="w-0.5 h-6 bg-slate-400"></div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Slider Control */}
-          <div className="p-6 bg-slate-50 border-t border-slate-200">
-            <Slider 
-              value={comparisonValue}
-              onValueChange={setComparisonValue}
-              max={100}
-              step={1}
-              className="w-full"
+        {/* Tab Content: Survey Comparison */}
+        {activeTab === 'survey' && (
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* Left: Real Satellite Map */}
+          <div className="xl:col-span-5 space-y-4 min-w-0">
+            <SatelliteMap
+              title="Live Satellite Map"
+              coordinates={{ latitude: regionData.center.lat, longitude: regionData.center.lng }}
+              zoom={regionData.zoom}
+              bounds={mapFocus === 'all' ? combinedBounds : undefined}
+              markers={regionMarkers}
+              industryName={regionData.name}
             />
-            <div className="flex justify-between mt-2">
-              <span className="text-xs text-slate-600">Before ({beforeDate})</span>
-              <span className="text-xs text-slate-600">After ({afterDate})</span>
-            </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Map and Quick Stats */}
-      <div className={`grid gap-6 ${selectedLandPlot ? 'lg:grid-cols-1' : 'lg:grid-cols-3'}`}>
-        {/* Satellite Map with Land Plot Highlighting */}
-        <div className={selectedLandPlot ? 'lg:col-span-1' : ''}>
-          <Card className="border-slate-200 overflow-hidden">
-            <CardHeader className="border-b border-slate-200 bg-slate-50 pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                {selectedLandPlot ? (
-                  <>
-                    <MapPin className="h-4 w-4 text-red-600" />
-                    {selectedIndustry?.companyName} - Land Plot Map
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4" />
-                    Plot Location (Satellite View)
-                  </>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {selectedLandPlot ? (
-                <div className="bg-slate-100 border border-slate-300 rounded-lg overflow-hidden" style={{ height: '500px' }}>
-                  {/* Land Plot Map Visualization */}
-                  <svg viewBox="0 0 800 600" className="w-full h-full" style={{backgroundColor: '#e8f4f8'}}>
-                    {/* Defs */}
-                    <defs>
-                      <linearGradient id="riverGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#7dd3fc" />
-                        <stop offset="100%" stopColor="#06b6d4" />
-                      </linearGradient>
-                    </defs>
-                    
-                    {/* Background */}
-                    <rect width="800" height="600" fill="#d2b48c" opacity="0.2" />
-                    
-                    {/* Terrain */}
-                    <rect x="250" y="50" width="300" height="400" fill="#9a8b72" opacity="0.15" />
-                    
-                    {/* River */}
-                    <path
-                      d="M 10,0 Q 30,100 20,200 Q 25,300 15,400 Q 35,500 20,600"
-                      stroke="url(#riverGradient2)"
-                      strokeWidth="35"
-                      fill="none"
-                      opacity="0.8"
-                    />
-                    
-                    {/* Roads */}
-                    <g stroke="#e8e8e8" strokeWidth="8" opacity="0.6">
-                      <line x1="120" y1="0" x2="120" y2="600" />
-                      <line x1="380" y1="0" x2="380" y2="600" />
-                      <line x1="0" y1="140" x2="800" y2="140" />
-                      <line x1="0" y1="280" x2="800" y2="280" />
-                      <line x1="0" y1="420" x2="800" y2="420" />
-                    </g>
-                    
-                    {/* Selected Plot - Simple Rendering */}
-                    {selectedLandPlot && selectedLandPlot.shape && selectedLandPlot.shape.type === 'polygon' && selectedLandPlot.shape.points ? (
-                      <>
-                        {/* Plot Polygon */}
-                        <polygon
-                          points={selectedLandPlot.shape.points}
-                          fill={getStatusColor(selectedLandPlot.status)}
-                          fillOpacity="0.5"
-                          stroke={getStatusColor(selectedLandPlot.status)}
-                          strokeWidth="4"
-                        />
-                        {/* Glow effect */}
-                        <polygon
-                          points={selectedLandPlot.shape.points}
-                          fill="none"
-                          stroke={getStatusColor(selectedLandPlot.status)}
-                          strokeWidth="8"
-                          opacity="0.2"
-                        />
-                      </>
-                    ) : null}
-                  </svg>
-                </div>
-              ) : (
-                <div style={{ height: '500px' }}>
-                  <SatelliteMap
-                    coordinates={{ latitude: 28.6139, longitude: 77.209 }}
-                    plotId={selectedPlot}
-                    title="Plot Location (Satellite View)"
-                    height="500px"
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Land Allotted Search Panel - Only show if no land plot selected */}
-        {!selectedLandPlot && (
-          <Card className="border-slate-200 lg:col-span-2">
-            <CardHeader className="border-b border-slate-200 bg-slate-50">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <MapPinCheck className="h-4 w-4" />
-                Land Allotted
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="space-y-4">
-                {/* Search Input */}
+          {/* Right: Survey Comparison */}
+          <div className="xl:col-span-7 space-y-5 min-w-0">
+            {/* Region Selection & Search */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Industrial Regions & Search</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Search Bar with Smart Suggestions */}
                 <div className="relative">
-                  <div className="relative flex items-center">
-                    <Search className="absolute left-2.5 h-4 w-4 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Search industry name, plot #, or ID..."
-                      value={landSearchTerm}
-                      onChange={(e) => setLandSearchTerm(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  {/* Search Results Dropdown */}
-                  {searchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50 max-h-72 overflow-y-auto">
-                      {searchResults.map((industry) => (
-                        <div
-                          key={industry.registrationNumber}
-                          onClick={() => handleSelectIndustry(industry)}
-                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-b-0 text-sm"
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search company, industry type, or location..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    onFocus={() => searchQuery.trim().length > 0 && setShowSuggestions(true)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  
+                  {/* Suggestions Dropdown */}
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                      {suggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className="w-full text-left px-4 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
                         >
-                          <p className="font-semibold text-slate-900">{industry.companyName}</p>
-                          <p className="text-xs text-slate-500">{industry.registrationNumber}</p>
-                        </div>
+                          <div className="flex items-center gap-2">
+                            <Search className="h-3 w-3 text-gray-400" />
+                            <span className="text-sm text-gray-900">{suggestion}</span>
+                          </div>
+                        </button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <p className="text-xs text-slate-500 text-center py-4">
-                  Search for an industry to view allotted land details and map
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Selected Industry Info Panel - Show when land plot is selected */}
-        {selectedLandPlot && selectedIndustry && (
-          <Card className="border-slate-200 lg:col-span-2">
-            <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-blue-50 to-blue-100">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-red-600" />
-                  {selectedIndustry.companyName}
-                </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedIndustry(null);
-                    setSelectedLandPlot(null);
-                    setLandSearchTerm('');
-                    setSearchResults([]);
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="space-y-4">
-                {/* Industry Image - Top Section */}
-                {(() => {
-                  const imagePath = getIndustryImagePath(selectedIndustry.id);
-                  return imagePath ? (
-                    <div className="w-full h-40 bg-slate-200 rounded-lg overflow-hidden border border-slate-300 mb-4">
-                      <img
-                        src={imagePath}
-                        alt={selectedIndustry.companyName}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  ) : null;
-                })()}
-
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Industry Details */}
-                  <div className="space-y-3 col-span-2">
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold">REGISTRATION ID</p>
-                      <p className="text-sm font-mono text-slate-900">{selectedIndustry.registrationNumber}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold">INDUSTRY TYPE</p>
-                      <p className="text-sm text-slate-900">{selectedIndustry.industryType}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold">COMPLIANCE STATUS</p>
-                      <Badge className="mt-1 bg-green-500">{selectedIndustry.complianceStatus}</Badge>
-                    </div>
-                  </div>
-
-                  {/* Plot Details */}
-                  <div className="space-y-3 bg-blue-50 p-3 rounded-lg border border-blue-200 col-span-2">
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold">PLOT ID</p>
-                      <p className="text-sm font-mono font-bold text-blue-900">{selectedLandPlot.plotNumber}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold">ALLOTTED AREA</p>
-                      <p className="text-sm text-slate-900">{selectedLandPlot.area} hectares</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold">STATUS</p>
-                      <Badge className="mt-1 bg-green-500">{selectedLandPlot.status}</Badge>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Object.entries(INDUSTRIAL_REGIONS).map(([key, data]) => (
+                    <Button
+                      key={key}
+                      onClick={() => handleRegionChange(key)}
+                      className={`${
+                        selectedRegion === key
+                          ? 'bg-[#059669] text-white hover:bg-[#059669]/90'
+                          : 'bg-white text-gray-900 border border-gray-300 hover:bg-gray-50'
+                      } w-full justify-start`}
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      {data.name}
+                    </Button>
+                  ))}
                 </div>
-
-                {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2 mt-4">
+                <div className="grid grid-cols-2 gap-2">
                   <Button
-                    onClick={() => setShowLandDetails(true)}
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={() => setMapFocus('all')}
+                    className={`${
+                      mapFocus === 'all'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-white text-gray-900 border border-gray-300 hover:bg-gray-50'
+                    }`}
                   >
-                    Full Details
+                    Show Both Regions
                   </Button>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedIndustry(null);
-                      setSelectedLandPlot(null);
-                      setLandSearchTerm('');
-                    }}
+                    onClick={() => setMapFocus('selected')}
+                    className={`${
+                      mapFocus === 'selected'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-white text-gray-900 border border-gray-300 hover:bg-gray-50'
+                    }`}
                   >
-                    Clear Selection
+                    Focus Selected
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Analysis Metadata */}
-        <Card className="border-slate-200">
-          <CardHeader className="border-b border-slate-200 bg-slate-50">
-            <CardTitle className="text-sm font-semibold">Data Quality</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs text-slate-600 mb-1">Source</p>
-                <p className="text-sm font-semibold text-slate-900">Sentinel 2 L2A</p>
-              </div>
-              <div className="border-t border-slate-200"></div>
-              <div>
-                <p className="text-xs text-slate-600 mb-1">Confidence</p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {changeDetectionData?.confidence ? `${(changeDetectionData.confidence * 100).toFixed(0)}%` : 'N/A'}
-                </p>
-              </div>
-              <div className="border-t border-slate-200"></div>
-              <div>
-                <p className="text-xs text-slate-600 mb-1">Time Period</p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {changeDetectionData?.timeframe?.daysDifference || 0} days
-                </p>
-              </div>
-              <div className="border-t border-slate-200"></div>
-              <div>
-                <p className="text-xs text-slate-600 mb-1">Resolution</p>
-                <p className="text-sm font-semibold text-slate-900">10m</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Split Screen: Map + Comparison when plot is selected */}
-      {selectedLandPlot && selectedIndustry && (
-        <Card className="border-emerald-300 shadow-lg">
-          <CardHeader className="border-b border-emerald-300 bg-gradient-to-r from-emerald-50 to-emerald-100">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-emerald-600" />
-                {selectedIndustry.companyName} - {selectedLandPlot.plotNumber}
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSelectedIndustry(null);
-                  setSelectedLandPlot(null);
-                }}
-              >
-                Close
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="grid lg:grid-cols-3 gap-0">
-              {/* Left: Satellite Map (1/3) */}
-              <div className="lg:col-span-1 border-r border-slate-200 p-4">
-                <h3 className="font-semibold text-slate-900 text-sm mb-3">Location Map</h3>
-                <div className="rounded-lg overflow-hidden border border-slate-300 h-80">
-                  <SatelliteMap
-                    coordinates={{
-                      latitude: selectedLandPlot.latitude || 28.5355,
-                      longitude: selectedLandPlot.longitude || 77.3910,
-                    }}
-                    plotId={selectedLandPlot.id}
-                    industryId={selectedIndustry.id}
-                    industryName={selectedIndustry.companyName}
-                    height="320px"
-                  />
-                </div>
-                <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-blue-900 mb-2">Details</p>
-                  <div className="space-y-1 text-xs text-blue-800">
-                    <p><span className="font-medium">Area:</span> {selectedLandPlot.area} ha</p>
-                    <p><span className="font-medium">Status:</span> {selectedLandPlot.status}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Before/After Comparison (2/3) */}
-              <div className="lg:col-span-2 relative aspect-video bg-slate-900 overflow-hidden">
-                {loading ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
-                    <Loader2 className="h-8 w-8 text-white animate-spin" />
-                  </div>
-                ) : (
-                  <>
-                    {/* Before Image */}
-                    <div 
-                      className="absolute inset-0 overflow-hidden"
-                      style={{ clipPath: `inset(0 ${100 - comparisonValue[0]}% 0 0)` }}
-                    >
-                      <img 
-                        src={satelliteImagery?.rgb?.url || 'https://via.placeholder.com/1200x600?text=Before+Image'}
-                        alt="Before"
-                        className="w-full h-full object-cover brightness-75"
-                      />
-                      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg">
-                        <p className="text-xs font-semibold text-slate-900">BEFORE: {beforeDate}</p>
-                      </div>
-                    </div>
-
-                    {/* After Image */}
-                    <div 
-                      className="absolute inset-0 overflow-hidden"
-                      style={{ clipPath: `inset(0 0 0 ${comparisonValue[0]}%)` }}
-                    >
-                      <img 
-                        src={
-                          viewMode === 'ndvi' ? satelliteImagery?.ndvi?.url :
-                          viewMode === 'false-color' ? satelliteImagery?.falseColor?.url :
-                          satelliteImagery?.rgb?.url || 'https://via.placeholder.com/1200x600?text=After+Image'
-                        }
-                        alt="After"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg">
-                        <p className="text-xs font-semibold text-slate-900">AFTER: {afterDate}</p>
-                      </div>
-                    </div>
-
-                    {/* Slider Line */}
-                    <div 
-                      className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize"
-                      style={{ left: `${comparisonValue[0]}%` }}
-                    >
-                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 h-12 w-12 bg-white rounded-full shadow-lg flex items-center justify-center">
-                        <div className="flex gap-1">
-                          <div className="w-0.5 h-6 bg-slate-400"></div>
-                          <div className="w-0.5 h-6 bg-slate-400"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Slider Control */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200">
-              <Slider 
-                value={comparisonValue}
-                onValueChange={setComparisonValue}
-                max={100}
-                step={1}
-                className="w-full"
-              />
-              <div className="flex justify-between mt-2">
-                <span className="text-xs text-slate-600">Before ({beforeDate})</span>
-                <span className="text-xs text-slate-600">After ({afterDate})</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Change Analysis Results */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Detailed Spectral Analysis */}
-        <Card className="border-slate-200">
-          <CardHeader className="border-b border-slate-200 bg-slate-50">
-            <CardTitle className="text-lg font-semibold">Detailed Spectral Analysis</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="space-y-4">
-              {changeDetectionData?.metrics ? (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="border border-slate-200 rounded-lg p-3">
-                      <p className="text-xs text-slate-600 font-medium">NDVI Change</p>
-                      <p className="text-lg font-bold text-slate-900">
-                        {(changeDetectionData.metrics.ndviChange * 100).toFixed(2)}%
-                      </p>
-                      <p className="text-xs text-slate-600">Vegetation Index</p>
-                    </div>
-                    <div className="border border-slate-200 rounded-lg p-3">
-                      <p className="text-xs text-slate-600 font-medium">NDBI Change</p>
-                      <p className="text-lg font-bold text-slate-900">
-                        {(changeDetectionData.metrics.ndbiChange * 100).toFixed(2)}%
-                      </p>
-                      <p className="text-xs text-slate-600">Built-up Index</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="border border-slate-200 rounded-lg p-3">
-                      <p className="text-xs text-slate-600 font-medium">MNDWI Change</p>
-                      <p className="text-lg font-bold text-slate-900">
-                        {(changeDetectionData.metrics.mndwiChange * 100).toFixed(2)}%
-                      </p>
-                      <p className="text-xs text-slate-600">Water Index</p>
-                    </div>
-                    <div className="border border-slate-200 rounded-lg p-3">
-                      <p className="text-xs text-slate-600 font-medium">EVI Change</p>
-                      <p className="text-lg font-bold text-slate-900">
-                        {(changeDetectionData.metrics.eviChange * 100).toFixed(2)}%
-                      </p>
-                      <p className="text-xs text-slate-600">Enhanced Vegetation</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm font-semibold text-blue-900 mb-2">Detection Details</p>
-                    <p className="text-sm text-blue-700">{changeDetectionData.description}</p>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-400" />
-                  <p className="text-xsmall text-slate-600 mt-2">Loading analysis...</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recommendations & Actions */}
-        <Card className="border-slate-200">
-          <CardHeader className="border-b border-slate-200 bg-slate-50">
-            <CardTitle className="text-lg font-semibold">Analysis & Recommendations</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="space-y-4">
-              {changeDetectionData ? (
-                <>
-                  {/* Summary Box */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                    <p className="text-sm font-semibold text-slate-900 mb-2">🛰️ Satellite Analysis</p>
-                    <p className="text-sm text-slate-700">
-                      Data source: Sentinel 2 L2A | Confidence: {((changeDetectionData.confidence ?? 0) * 100).toFixed(0)}%
-                    </p>
-                  </div>
-
-                  {/* Change Status Box */}
-                  {changeDetectionData.changeDetected && (
-                    <div className={`border rounded-lg p-4 ${
-                      changeDetectionData.severity === 'CRITICAL' 
-                        ? 'border-red-200 bg-red-50'
-                        : 'border-amber-200 bg-amber-50'
-                    }`}>
-                      <p className="text-sm font-semibold mb-2">
-                        {changeDetectionData.severity === 'CRITICAL' 
-                          ? '🚨 Critical Change Detected'
-                          : '⚠️ Change Detected'}
-                      </p>
-                      <p className="text-sm text-slate-700">
-                        {changeDetectionData.description}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Recommendations */}
-                  {changeDetectionData.recommendations && changeDetectionData.recommendations.length > 0 && (
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900 mb-3">Recommended Actions</p>
-                      <div className="space-y-2">
-                        {changeDetectionData.recommendations.map((rec, idx) => (
-                          <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded">
-                            <div className="h-6 w-6 bg-slate-300 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
-                              {idx + 1}
-                            </div>
-                            <p className="text-sm text-slate-700">{rec}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Data Quality */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                    <p className="text-sm font-semibold text-slate-900 mb-2">Data Quality</p>
-                    <div className="space-y-1 text-xs text-slate-600">
-                      <div>✓ Multi-spectral analysis</div>
-                      <div>✓ AI-powered change detection</div>
-                      <div>✓ Sentinel 2 L2A processed imagery</div>
-                      <div>✓ Temporal comparison: {changeDetectionData.timeframe?.daysDifference} days</div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-400" />
-                  <p className="text-xs text-slate-600 mt-2">Generating recommendations...</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      {/* Land Allotted Details Slide-in Panel */}
-      {showLandDetails && selectedIndustry && selectedLandPlot && (
-        <div className="fixed inset-0 z-50">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/30 transition-opacity"
-            onClick={() => setShowLandDetails(false)}
-          />
-
-          {/* Slide-in Panel */}
-          <div className="absolute right-0 top-0 bottom-0 w-full sm:w-[500px] bg-white shadow-2xl transition-transform duration-300 ease-in-out overflow-y-auto">
-            {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <MapPinCheck className="h-5 w-5" />
-                Land Allotment Details
-              </h2>
-              <button
-                onClick={() => setShowLandDetails(false)}
-                className="text-white hover:bg-blue-500 p-1 rounded-full transition"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-6">
-              {/* Industry Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-slate-600 mb-3">INDUSTRY INFORMATION</h3>
-                <div className="space-y-3 bg-slate-50 p-4 rounded-lg">
-                  <div>
-                    <p className="text-xs text-slate-600">Company Name</p>
-                    <p className="text-sm font-semibold text-slate-900">{selectedIndustry.companyName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Registration Number</p>
-                    <p className="text-sm font-mono text-slate-900">{selectedIndustry.registrationNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Industry Type</p>
-                    <p className="text-sm text-slate-900">{selectedIndustry.industryType}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Compliance Status</p>
-                    <Badge
-                      className={`mt-1 ${
-                        selectedIndustry.complianceStatus === 'Compliant'
-                          ? 'bg-green-500'
-                          : 'bg-yellow-500'
-                      }`}
-                    >
-                      {selectedIndustry.complianceStatus}
-                    </Badge>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Compliance Score</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 bg-slate-200 rounded-full h-2">
-                        <div
-                          className="bg-green-500 h-2 rounded-full"
-                          style={{ width: `${selectedIndustry.complianceScore}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-semibold text-slate-900">
-                        {selectedIndustry.complianceScore}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Plot Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-slate-600 mb-3">PLOT INFORMATION</h3>
-                <div className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div>
-                    <p className="text-xs text-slate-600">Plot ID</p>
-                    <p className="text-sm font-mono font-semibold text-blue-900">{selectedLandPlot.plotNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Allotted Area</p>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {selectedLandPlot.area} hectares ({(selectedLandPlot.area * 10000).toFixed(0)} m²)
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Land Purpose</p>
-                    <p className="text-sm text-slate-900">Industrial Facility: {selectedLandPlot.industryType}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Status</p>
-                    <Badge className="mt-1 bg-green-500">{selectedLandPlot.status}</Badge>
-                  </div>
-                </div>
-              </div>
-
-              {/* Environmental & Legal */}
-              <div>
-                <h3 className="text-sm font-semibold text-slate-600 mb-3">ENVIRONMENTAL & COMPLIANCE</h3>
-                <div className="space-y-3 bg-amber-50 p-4 rounded-lg border border-amber-200">
-                  <div>
-                    <p className="text-xs text-slate-600">Environmental Status</p>
-                    <Badge className="mt-1 bg-blue-500">{selectedLandPlot.environmentalStatus}</Badge>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Environmental Clearance Validity</p>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {typeof selectedIndustry.environmentalClearance === 'object' && selectedIndustry.environmentalClearance?.validUntil ? selectedIndustry.environmentalClearance.validUntil : 'Active'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Last Inspection Date</p>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {selectedIndustry.lastInspectionDate || 'No recent inspection'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-slate-600 mb-3">CONTACT INFORMATION</h3>
-                <div className="space-y-2 bg-slate-50 p-4 rounded-lg">
-                  {selectedIndustry.contacts?.primary && (
-                    <div>
-                      <p className="text-xs text-slate-600">Primary Contact</p>
-                      <p className="text-sm text-slate-900">{selectedIndustry.contacts.primary.name}</p>
-                      <p className="text-xs text-slate-500">{selectedIndustry.contacts.primary.phone}</p>
-                    </div>
-                  )}
-                  {selectedIndustry.location && (
-                    <div>
-                      <p className="text-xs text-slate-600">Location</p>
-                      <p className="text-sm text-slate-900">{selectedIndustry.location}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-2 sticky bottom-0 bg-gradient-to-t from-white pt-4">
-                <Button onClick={() => setShowLandDetails(false)} className="w-full bg-blue-600 hover:bg-blue-700">
-                  View on Map & Close
-                </Button>
-                <Button variant="outline" onClick={() => setShowLandDetails(false)} className="w-full">
-                  Close
-                </Button>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      )}
+        )}
+
+        {/* Selected Plot Details */}
+        {/* Industry Search Results with Images */}
+        {activeTab === 'survey' && searchQuery && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5" />
+                Industry Search Results: "{searchQuery}"
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              {(() => {
+                const matchedIndustries = industriesData.filter(industry => 
+                  industry.companyName.toLowerCase().includes(searchQuery) ||
+                  industry.industryType.toLowerCase().includes(searchQuery) ||
+                  industry.location.toLowerCase().includes(searchQuery)
+                );
+
+                if (matchedIndustries.length === 0) {
+                  return (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No industries found matching "{searchQuery}"</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {matchedIndustries.map((industry) => {
+                      // Map company name to image filename
+                      const getImagePath = (companyName: string) => {
+                        const nameMap: Record<string, string> = {
+                          'Bhilai Steel Manufacturing Ltd.': 'bhilai steel plant block.png',
+                          'Chhattisgarh Pharma Industries': 'chhattisgarh pharma industries.png',
+                          'TechCG Electronics Pvt. Ltd.': 'techcg electronics.png',
+                          'Mahadev Textile Mills': 'textilepark.industry.png',
+                          'Agro Foods Processing Ltd.': 'agro foods.png',
+                          'InfoTech Solutions Hub': 'infotech solutions.png',
+                          'ChemTech Industries Pvt. Ltd.': 'chemtech industries.png',
+                          'AutoParts Manufacturing Co.': 'autoparts manufacturing.png',
+                          'Green Energy Solutions': 'green energy.png',
+                          'Precision Tools & Dies Ltd.': 'precision tools.png',
+                          'Sarda Energy and Minerals Ltd': 'sarda energy and minerals ltd.png',
+                          'Sarthak Metals Ltd': 'sarthak metals ltd.png',
+                          'Mahamaya Sponge Pvt Ltd': 'mahamaya sponge pvt ltd.png',
+                          'Nakoda TMT': 'nakoda tmt.png',
+                          'Bansal Metallics': 'bansal metallics.png',
+                          'BigMint (Steelmint)': 'bigmint (steelmint).png',
+                          'Textile Park': 'textilepark.industry.png',
+                          'Plastic Park': 'plasticpark.industry.png',
+                          'Rail Park': 'railpark.industry.png',
+                          'Balod Bharda Industry': 'balod.bharda.industry.png',
+                          'Barabaspur Industry': 'barabaspur.industry.png',
+                          'Parasiya Industry': 'parasiya.industry.png',
+                          'Rikhi Industry': 'rikhi.industry.png',
+                          'Tilda Industry': 'tilda.industry.png',
+                          'Ulakiya Industry': 'ulakiya.industry.png',
+                          'KESDA (Industrial Estate)': 'kesda.industry.png',
+                          'Beekay Engineering Corporation': 'beekay engineering corporation.png',
+                        };
+                        return nameMap[companyName] || 'default-industry.png';
+                      };
+
+                      const imagePath = getImagePath(industry.companyName);
+
+                      return (
+                        <div key={industry.id} className="border border-gray-300 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+                          {/* Industry Image */}
+                          <div className="relative bg-gray-200 h-48 overflow-hidden">
+                            <img
+                              src={`/industry-images/${imagePath}`}
+                              alt={industry.companyName}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Industry+Image';
+                              }}
+                            />
+                            <div className="absolute top-2 right-2 bg-white p-1 rounded shadow-md">
+                              <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                                industry.complianceStatus === 'Compliant' ? 'bg-green-100 text-green-800' :
+                                industry.complianceStatus === 'Violation' ? 'bg-red-100 text-red-800' :
+                                industry.complianceStatus === 'Under Review' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {industry.complianceStatus}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Industry Details */}
+                          <div className="p-4 bg-white">
+                            <h3 className="font-bold text-gray-900 mb-2 line-clamp-2">{industry.companyName}</h3>
+                            
+                            <div className="space-y-1 text-sm mb-3">
+                              <p className="text-gray-600"><strong>Type:</strong> {industry.industryType}</p>
+                              <p className="text-gray-600"><strong>Location:</strong> {industry.location}</p>
+                              <p className="text-gray-600"><strong>Area:</strong> {industry.area.toLocaleString()} sqm</p>
+                              <p className="text-gray-600"><strong>Employees:</strong> {industry.employeeCount}</p>
+                              <p className="text-gray-600"><strong>Revenue:</strong> {industry.annualRevenue}</p>
+                            </div>
+
+                            {/* Certifications */}
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              {industry.certifications.slice(0, 2).map((cert, idx) => (
+                                <span key={idx} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                  {cert}
+                                </span>
+                              ))}
+                              {industry.certifications.length > 2 && (
+                                <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">
+                                  +{industry.certifications.length - 2} more
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Contact Info */}
+                            <div className="pt-3 border-t border-gray-200 text-xs text-gray-600">
+                              <p>Contact: <strong>{industry.contactPerson}</strong></p>
+                              <p className="text-blue-600 break-all">{industry.email}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Tab Content: Visual Compare */}
+        {activeTab === 'compare' && (
+        <div className="space-y-6">
+          {/* Comparison Controls */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Region</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(INDUSTRIAL_REGIONS).map(([key, data]) => (
+                    <button
+                      key={key}
+                      onClick={() => handleRegionChange(key)}
+                      className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                        selectedRegion === key
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                      }`}
+                    >
+                      {data.name}
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">View Mode</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setMapFocus('all')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      mapFocus === 'all'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                    }`}
+                  >
+                    Show All Regions
+                  </button>
+                  <button
+                    onClick={() => setMapFocus('selected')}
+                    className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                      mapFocus === 'selected'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                    }`}
+                  >
+                    Focus Selected
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Search Industries</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Split View: Satellite Map + Industry Photos */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left: Google Map with Industry Markers */}
+            <Card className="h-96">
+              <CardHeader>
+                <CardTitle className="text-base">🗺️ Google Map View - Search Results</CardTitle>
+              </CardHeader>
+              <CardContent className="h-80 p-0">
+                {(() => {
+                  const matchedIndustries = searchQuery
+                    ? industriesData.filter(industry => 
+                        industry.companyName.toLowerCase().includes(searchQuery) ||
+                        industry.industryType.toLowerCase().includes(searchQuery) ||
+                        industry.location.toLowerCase().includes(searchQuery)
+                      )
+                    : industriesData.slice(0, 10);
+
+                  const mapCenter = matchedIndustries.length > 0 
+                    ? getIndustryCoordinates(matchedIndustries[0].companyName)
+                    : { lat: 21.0665, lng: 81.7399 };
+
+                  return (
+                    <div className="w-full h-full bg-gray-100 relative">
+                      <GoogleMapReact
+                        bootstrapURLKeys={{ key: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyC-qM2j4nPjJGaLJADYfR-VYSFvZ-QHoXo' }}
+                        center={mapCenter}
+                        defaultZoom={15}
+                        yesIWantToUseGoogleMapApiInternals
+                      >
+                        {matchedIndustries.map((industry) => {
+                          const coords = getIndustryCoordinates(industry.companyName);
+                          return (
+                            <MarkerComponent
+                              key={industry.id}
+                              id={industry.id}
+                              companyName={industry.companyName}
+                              isSelected={selectedMarker === industry.id}
+                              lat={coords.lat}
+                              lng={coords.lng}
+                            />
+                          );
+                        })}
+                      </GoogleMapReact>
+                      {matchedIndustries.length > 0 && (
+                        <div className="absolute top-2 left-2 bg-white px-3 py-2 rounded shadow text-xs text-gray-700 z-10">
+                          {matchedIndustries.length} location{matchedIndustries.length !== 1 ? 's' : ''} found
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Right: Industry Photos Grid */}
+            <Card className="h-96 overflow-hidden">
+              <CardHeader>
+                <CardTitle className="text-base">🖼️ Industry Photos</CardTitle>
+              </CardHeader>
+              <CardContent className="h-80 overflow-y-auto p-3">
+                {(() => {
+                  const matchedIndustries = searchQuery
+                    ? industriesData.filter(industry => 
+                        industry.companyName.toLowerCase().includes(searchQuery) ||
+                        industry.industryType.toLowerCase().includes(searchQuery) ||
+                        industry.location.toLowerCase().includes(searchQuery)
+                      )
+                    : industriesData.slice(0, 6);
+
+                  if (matchedIndustries.length === 0) {
+                    return (
+                      <div className="flex items-center justify-center h-full">
+                        <p className="text-gray-500 text-sm">No industries found</p>
+                      </div>
+                    );
+                  }
+
+                  // Map company name to image filename
+                  const getImagePath = (companyName: string) => {
+                    const nameMap: Record<string, string> = {
+                      'Bhilai Steel Manufacturing Ltd.': 'bhilai steel plant block.png',
+                      'Chhattisgarh Pharma Industries': 'chhattisgarh pharma industries.png',
+                      'TechCG Electronics Pvt. Ltd.': 'techcg electronics.png',
+                      'Mahadev Textile Mills': 'textilepark.industry.png',
+                      'Agro Foods Processing Ltd.': 'agro foods.png',
+                      'InfoTech Solutions Hub': 'infotech solutions.png',
+                      'ChemTech Industries Pvt. Ltd.': 'chemtech industries.png',
+                      'AutoParts Manufacturing Co.': 'autoparts manufacturing.png',
+                      'Green Energy Solutions': 'green energy.png',
+                      'Precision Tools & Dies Ltd.': 'precision tools.png',
+                      'Sarda Energy and Minerals Ltd': 'sarda energy and minerals ltd.png',
+                      'Sarthak Metals Ltd': 'sarthak metals ltd.png',
+                      'Mahamaya Sponge Pvt Ltd': 'mahamaya sponge pvt ltd.png',
+                      'Nakoda TMT': 'nakoda tmt.png',
+                      'Bansal Metallics': 'bansal metallics.png',
+                      'BigMint (Steelmint)': 'bigmint (steelmint).png',
+                      'Textile Park': 'textilepark.industry.png',
+                      'Plastic Park': 'plasticpark.industry.png',
+                      'Rail Park': 'railpark.industry.png',
+                      'Balod Bharda Industry': 'balod.bharda.industry.png',
+                      'Barabaspur Industry': 'barabaspur.industry.png',
+                      'Parasiya Industry': 'parasiya.industry.png',
+                      'Rikhi Industry': 'rikhi.industry.png',
+                      'Tilda Industry': 'tilda.industry.png',
+                      'Ulakiya Industry': 'ulakiya.industry.png',
+                      'KESDA (Industrial Estate)': 'kesda.industry.png',
+                      'Beekay Engineering Corporation': 'beekay engineering corporation.png',
+                    };
+                    return nameMap[companyName] || 'default-industry.png';
+                  };
+
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {matchedIndustries.map((industry) => {
+                        const imagePath = getImagePath(industry.companyName);
+
+                        return (
+                          <div key={industry.id} className="group cursor-pointer">
+                            <div className="relative bg-gray-300 rounded h-28 overflow-hidden">
+                              <img
+                                src={`/industry-images/${imagePath}`}
+                                alt={industry.companyName}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Industry';
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-40 transition-opacity duration-300"></div>
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <p className="text-white text-xs font-semibold line-clamp-2">{industry.companyName}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Detailed Comparison Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Detailed Industry Comparison</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 border-b border-gray-300">
+                    <tr>
+                      <th className="text-left px-4 py-2 font-semibold">Company</th>
+                      <th className="text-left px-4 py-2 font-semibold">Type</th>
+                      <th className="text-left px-4 py-2 font-semibold">Location</th>
+                      <th className="text-left px-4 py-2 font-semibold">Area</th>
+                      <th className="text-left px-4 py-2 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const matchedIndustries = searchQuery
+                        ? industriesData.filter(industry => 
+                            industry.companyName.toLowerCase().includes(searchQuery) ||
+                            industry.industryType.toLowerCase().includes(searchQuery) ||
+                            industry.location.toLowerCase().includes(searchQuery)
+                          )
+                        : industriesData.slice(0, 8);
+
+                      return matchedIndustries.map((industry) => (
+                        <tr key={industry.id} className="border-b border-gray-200 hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium">{industry.companyName}</td>
+                          <td className="px-4 py-3">{industry.industryType}</td>
+                          <td className="px-4 py-3">{industry.location}</td>
+                          <td className="px-4 py-3">{industry.area.toLocaleString()} sqm</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                              industry.complianceStatus === 'Compliant' ? 'bg-green-100 text-green-800' :
+                              industry.complianceStatus === 'Violation' ? 'bg-red-100 text-red-800' :
+                              industry.complianceStatus === 'Under Review' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-blue-100 text-blue-800'
+                            }`}>
+                              {industry.complianceStatus}
+                            </span>
+                          </td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        )}
+
+      </div>
     </div>
   );
 }
